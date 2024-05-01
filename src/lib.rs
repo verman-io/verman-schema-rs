@@ -14,7 +14,7 @@ pub struct Root {
 
     pub stack: indexmap::IndexMap<String, Vec<ServerConfiguration>>,
     pub stack_state: indexmap::IndexMap<String, StateValues>,
-    pub stack_web_server_or_proxy: Vec<ProtocolConfiguration>,
+    pub stack_routing: Vec<ProtocolConfiguration>,
 
     pub component: Vec<Component>,
 }
@@ -128,7 +128,7 @@ mod tests {
                         },
                     );
                     state.insert(
-                        String::from("web_server_or_proxy"),
+                        String::from("routing"),
                         StateValues {
                             kind: None,
                             install: Some(State::Always),
@@ -175,7 +175,7 @@ mod tests {
                 );
                 stack
             },
-            stack_web_server_or_proxy: vec![ProtocolConfiguration{
+            stack_routing: vec![ProtocolConfiguration{
                 name: String::from("my_name.verman.io"),
                 protocol: String::from("https"),
                 certificate_vendor: Some(String::from("LetsEncrypt")),
@@ -197,7 +197,7 @@ mod tests {
                 },
                 Component{
                     src: None,
-                    kind: String::from("web_server_or_proxy"),
+                    kind: String::from("routing"),
                     version: None,
                     uri: String::from("my_app.verman.io"),
                     mounts: {
@@ -231,7 +231,7 @@ mod tests {
         let j = serde_json::to_string(&config).unwrap();
         assert_eq!(
             j,
-            r###"{"name":"verman-schema-rs","version":"0.0.1","license":"(Apache-2.0 OR MIT)","homepage":"https://verman.io","repo":"https://github.com/verman-io","authors":[""],"stack":{"database":[{"kind":"sql","versions":null,"server_priority":null}],"application_server":[{"kind":"python","versions":["~2.7","~3.6","~3.13"],"server_priority":["Waitress","mod_wsgi","uvicorn"]},{"kind":"ruby","versions":null,"server_priority":null}]},"stack_state":{"database":{"kind":"sql","install":"always","remove":null,"start":"always","stop":null},"application_server":{"kind":null,"install":"always","remove":null,"start":"always","stop":null},"web_server_or_proxy":{"kind":null,"install":"always","remove":null,"start":"always","stop":null}},"stack_web_server_or_proxy":[{"name":"my_name.verman.io","protocol":"https","certificate_vendor":"LetsEncrypt"}],"component":[{"src":"./python_api_folder/","kind":"python","version":">3.8","uri":"http://localhost:${env.PYTHON_API_PORT}","mounts":null},{"src":"./ruby_api_folder/","kind":"ruby","version":">3.1.2, <3.2","uri":"${if(WIN32) { \"\\\\.\\pipe\\PipeName\" } else { \"unix:///var/run/my-socket.sock\" }}","mounts":null},{"src":null,"kind":"web_server_or_proxy","version":null,"uri":"my_app.verman.io","mounts":{"/api/py":{"kind":"python","location":"${stack.components[.kind==\"python\"].uri}"},"/api/ruby":{"kind":"ruby","location":"${stack.components[.kind==\"ruby\"].uri}"},"/":{"kind":"static","location":"${env.WWWROOT}"}}}]}"###
+            r###"{"name":"verman-schema-rs","version":"0.0.1","license":"(Apache-2.0 OR MIT)","homepage":"https://verman.io","repo":"https://github.com/verman-io","authors":[""],"stack":{"database":[{"kind":"sql","versions":null,"server_priority":null}],"application_server":[{"kind":"python","versions":["~2.7","~3.6","~3.13"],"server_priority":["Waitress","mod_wsgi","uvicorn"]},{"kind":"ruby","versions":null,"server_priority":null}]},"stack_state":{"database":{"kind":"sql","install":"always","remove":null,"start":"always","stop":null},"application_server":{"kind":null,"install":"always","remove":null,"start":"always","stop":null},"routing":{"kind":null,"install":"always","remove":null,"start":"always","stop":null}},"stack_routing":[{"name":"my_name.verman.io","protocol":"https","certificate_vendor":"LetsEncrypt"}],"component":[{"src":"./python_api_folder/","kind":"python","version":">3.8","uri":"http://localhost:${env.PYTHON_API_PORT}","mounts":null},{"src":"./ruby_api_folder/","kind":"ruby","version":">3.1.2, <3.2","uri":"${if(WIN32) { \"\\\\.\\pipe\\PipeName\" } else { \"unix:///var/run/my-socket.sock\" }}","mounts":null},{"src":null,"kind":"routing","version":null,"uri":"my_app.verman.io","mounts":{"/api/py":{"kind":"python","location":"${stack.components[.kind==\"python\"].uri}"},"/api/ruby":{"kind":"ruby","location":"${stack.components[.kind==\"ruby\"].uri}"},"/":{"kind":"static","location":"${env.WWWROOT}"}}}]}"###
         );
     }
 }
