@@ -82,8 +82,10 @@ pub struct Component {
     pub kind: String,
     pub version: Option<String>,
     pub uri: String,
-    pub vendor: Option<indexmap::IndexMap<String, indexmap::IndexMap<Os, KindAndLocation>>>,
-    pub mounts: Option<indexmap::IndexMap<String, VendorVersion>>,
+    /* `vendor` example: {"nginx": {"windows": "./win_nginx.site_avail.conf",
+    "_": "./nginx.site_avail.conf"}} */
+    pub vendor: Option<indexmap::IndexMap<String, indexmap::IndexMap<usize, KindAndLocation>>>,
+    pub mounts: Option<indexmap::IndexMap<String, KindAndLocation>>,
 }
 
 /// OSs from https://github.com/rust-lang/rust/blob/1.77.0/library/std/src/env.rs#L947-L961
@@ -100,11 +102,13 @@ pub enum Os {
     Android,
     Windows,
     /// Sometimes useful for all OSs
-    Unspecified
+    Unspecified,
 }
 
 impl Default for Os {
-    fn default() -> Self { Os::Unspecified }
+    fn default() -> Self {
+        Os::Unspecified
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -122,9 +126,10 @@ pub struct KindAndLocation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const VERMAN_JSON: &'static str = include_str!("verman.json");
 
     #[test]
-    fn it_serializes() {
+    fn it_serdes() {
         let config = Root {
             name: String::from(env!("CARGO_PKG_NAME")),
             version: String::from(env!("CARGO_PKG_VERSION")),
@@ -214,6 +219,7 @@ mod tests {
                     kind: String::from("python"),
                     version: Some(String::from(">3.8")),
                     uri: String::from("http://localhost:${env.PYTHON_API_PORT}"),
+                    vendor: None,
                     mounts: None,
                 },
                 Component{
@@ -221,6 +227,7 @@ mod tests {
                     kind: String::from("ruby"),
                     version: Some(String::from(">3.1.2, <3.2")),
                     uri: String::from("${if(WIN32) { \"\\\\.\\pipe\\PipeName\" } else { \"unix:///var/run/my-socket.sock\" }}"),
+                    vendor: None,
                     mounts: None,
                 },
                 Component{
@@ -228,6 +235,16 @@ mod tests {
                     kind: String::from("routing"),
                     version: None,
                     uri: String::from("my_app.verman.io"),
+                    vendor: {
+                        let mut vendor = indexmap::IndexMap::<String, indexmap::IndexMap::<usize, KindAndLocation>>::new();
+                        vendor.insert(String::from("nginx"), {
+                            let mut os_to_kind_and_location = indexmap::IndexMap::<usize, KindAndLocation>::new();
+                            os_to_kind_and_location.insert(Os::Windows as usize, KindAndLocation { kind: String::from("server_block"), location: String::from("./win_nginx.site_avail.conf") });
+                            os_to_kind_and_location.insert(Os::Unspecified as usize, KindAndLocation { kind: String::from("server_block"), location: String::from("./nginx.site_avail.conf") });
+                            os_to_kind_and_location
+                        });
+                        Some(vendor)
+                    },
                     mounts: {
                         let mut mounts = indexmap::IndexMap::<String, KindAndLocation>::new();
                         mounts.insert(
@@ -256,10 +273,10 @@ mod tests {
                 },
             ],
         };
-        let j = serde_json::to_string(&config).unwrap();
+        let root: Root = serde_json::from_str(&VERMAN_JSON).unwrap();
         assert_eq!(
-            j,
-            r###"{"name":"verman-schema-rs","version":"0.0.1","license":"(Apache-2.0 OR MIT)","homepage":"https://verman.io","repo":"https://github.com/verman-io","authors":[""],"stack":{"database":[{"kind":"sql","versions":null,"server_priority":null}],"application_server":[{"kind":"python","versions":["~2.7","~3.6","~3.13"],"server_priority":["Waitress","mod_wsgi","uvicorn"]},{"kind":"ruby","versions":null,"server_priority":null}]},"stack_state":{"database":{"kind":"sql","install":"always","remove":null,"start":"always","stop":null},"application_server":{"kind":null,"install":"always","remove":null,"start":"always","stop":null},"routing":{"kind":null,"install":"always","remove":null,"start":"always","stop":null}},"stack_routing":[{"name":"my_name.verman.io","protocol":"https","certificate_vendor":"LetsEncrypt"}],"component":[{"src":"./python_api_folder/","kind":"python","version":">3.8","uri":"http://localhost:${env.PYTHON_API_PORT}","mounts":null},{"src":"./ruby_api_folder/","kind":"ruby","version":">3.1.2, <3.2","uri":"${if(WIN32) { \"\\\\.\\pipe\\PipeName\" } else { \"unix:///var/run/my-socket.sock\" }}","mounts":null},{"src":null,"kind":"routing","version":null,"uri":"my_app.verman.io","mounts":{"/api/py":{"kind":"python","location":"${stack.components[.kind==\"python\"].uri}"},"/api/ruby":{"kind":"ruby","location":"${stack.components[.kind==\"ruby\"].uri}"},"/":{"kind":"static","location":"${env.WWWROOT}"}}}]}"###
+            serde_json::to_string(&config).unwrap(),
+            serde_json::to_string(&root).unwrap()
         );
     }
 }
