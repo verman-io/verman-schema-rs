@@ -82,7 +82,35 @@ pub struct Component {
     pub kind: String,
     pub version: Option<String>,
     pub uri: String,
-    pub mounts: Option<indexmap::IndexMap<String, KindAndLocation>>,
+    pub vendor: Option<indexmap::IndexMap<String, indexmap::IndexMap<Os, KindAndLocation>>>,
+    pub mounts: Option<indexmap::IndexMap<String, VendorVersion>>,
+}
+
+/// OSs from https://github.com/rust-lang/rust/blob/1.77.0/library/std/src/env.rs#L947-L961
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Os {
+    Linux,
+    Macos,
+    Ios,
+    Freebsd,
+    Dragonfly,
+    Netbsd,
+    Openbsd,
+    Solaris,
+    Android,
+    Windows,
+    /// Sometimes useful for all OSs
+    Unspecified
+}
+
+impl Default for Os {
+    fn default() -> Self { Os::Unspecified }
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct VendorVersion {
+    pub vendor: String,
+    pub version: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
