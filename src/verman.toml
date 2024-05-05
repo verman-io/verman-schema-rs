@@ -54,7 +54,7 @@ uri = "my_app.verman.io"
 kind = "server_block"
 location = "./win_nginx.site_avail.conf"
 
-[component.vendor.nginx.unspecified]
+[component.vendor.nginx.linux]
 kind = "server_block"
 location = "./nginx.site_avail.conf"
 

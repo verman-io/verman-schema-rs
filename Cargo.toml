@@ -10,4 +10,3 @@ serde_json = "1.0.116"
 serde_derive = "1.0.199"
 indexmap = { version = "2.2.6", features = ["serde"] }
 toml = { version = "0.8.12", features = ["preserve_order"] }
-strum = { version = "0.26.2", features = ["derive", "strum_macros"] }

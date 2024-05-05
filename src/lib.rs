@@ -1,5 +1,4 @@
 extern crate serde;
-extern crate strum;
 
 use serde_derive::{Deserialize, Serialize};
 
@@ -39,9 +38,10 @@ pub enum State {
     /// [service] reload if stopped otherwise start
     Graceful,
 
-    /// [service] ping: if not started/installed:
-    /// - ping next service in array until end
-    /// - error if no services are pingable
+    /// [app/component] use if installed otherwise move to next
+    /// - error if no app/component of `kind` is found
+    /// [service] use if `ping`able otherwise move to next
+    /// - error if no service of `kind` iss pingable
     /// - otherwise set env var | config for pingable service
     Untouched,
 
@@ -89,7 +89,7 @@ pub struct Component {
 }
 
 /// OSs from https://github.com/rust-lang/rust/blob/1.77.0/library/std/src/env.rs#L947-L961
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, strum::AsRefStr)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Os {
     Linux,
@@ -128,6 +128,7 @@ pub struct KindAndLocation {
 mod tests {
     use super::*;
     const VERMAN_JSON: &'static str = include_str!("verman.json");
+    const VERMAN_TOML: &'static str = include_str!("verman.toml");
 
     #[test]
     fn it_serdes() {
@@ -241,7 +242,7 @@ mod tests {
                         vendor.insert(String::from("nginx"), {
                             let mut os_to_kind_and_location = indexmap::IndexMap::<Os, KindAndLocation>::new();
                             os_to_kind_and_location.insert(Os::Windows, KindAndLocation { kind: String::from("server_block"), location: String::from("./win_nginx.site_avail.conf") });
-                            os_to_kind_and_location.insert(Os::Unspecified, KindAndLocation { kind: String::from("server_block"), location: String::from("./nginx.site_avail.conf") });
+                            os_to_kind_and_location.insert(Os::Linux, KindAndLocation { kind: String::from("server_block"), location: String::from("./nginx.site_avail.conf") });
                             os_to_kind_and_location
                         });
                         Some(vendor)
@@ -274,13 +275,17 @@ mod tests {
                 },
             ],
         };
-        let root: Root = serde_json::from_str(&VERMAN_JSON).unwrap();
-        let toml_str = toml::to_string(&config).unwrap();
-        println!("{}", toml_str);
-        std::fs::write("verman.toml", toml_str).expect("Could not write to file!");
+        let root_from_json: Root = serde_json::from_str(&VERMAN_JSON).unwrap();
+        let root_from_toml: Root = toml::from_str(&VERMAN_TOML).unwrap();
+        std::fs::write("./src/verman.toml", toml::to_string(&config).unwrap())
+            .expect("Could not write to file!");
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            serde_json::to_string(&root).unwrap()
+            serde_json::to_string(&root_from_json).unwrap()
+        );
+        assert_eq!(
+            toml::to_string(&config).unwrap(),
+            toml::to_string(&root_from_toml).unwrap()
         );
     }
 }
