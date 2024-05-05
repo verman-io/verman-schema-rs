@@ -1,7 +1,8 @@
 extern crate serde;
 
-use serde_derive::Deserialize;
-use serde_derive::Serialize;
+use serde_derive::{Deserialize, Serialize};
+
+use serde_with::{serde_as, DisplayFromStr};
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Root {
@@ -76,6 +77,7 @@ pub struct ProtocolConfiguration {
     pub certificate_vendor: Option<String>,
 }
 
+#[serde_as]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Component {
     pub src: Option<String>,
@@ -84,6 +86,7 @@ pub struct Component {
     pub uri: String,
     /* `vendor` example: {"nginx": {"windows": "./win_nginx.site_avail.conf",
     "_": "./nginx.site_avail.conf"}} */
+    #[serde_as(as = "Option<indexmap::IndexMap<String, indexmap::IndexMap<DisplayFromStr, KindAndLocation>>>")]
     pub vendor: Option<indexmap::IndexMap<String, indexmap::IndexMap<usize, KindAndLocation>>>,
     pub mounts: Option<indexmap::IndexMap<String, KindAndLocation>>,
 }
@@ -117,6 +120,7 @@ pub struct VendorVersion {
     pub version: Option<String>,
 }
 
+#[serde_as]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct KindAndLocation {
     pub kind: String,
@@ -274,6 +278,8 @@ mod tests {
             ],
         };
         let root: Root = serde_json::from_str(&VERMAN_JSON).unwrap();
+        let toml_data = toml::to_string(&config).unwrap();
+        println!("{}", toml_data);
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
             serde_json::to_string(&root).unwrap()
