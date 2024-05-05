@@ -1,8 +1,7 @@
 extern crate serde;
+extern crate strum;
 
 use serde_derive::{Deserialize, Serialize};
-
-use serde_with::{serde_as, DisplayFromStr};
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Root {
@@ -77,7 +76,6 @@ pub struct ProtocolConfiguration {
     pub certificate_vendor: Option<String>,
 }
 
-#[serde_as]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Component {
     pub src: Option<String>,
@@ -86,13 +84,13 @@ pub struct Component {
     pub uri: String,
     /* `vendor` example: {"nginx": {"windows": "./win_nginx.site_avail.conf",
     "_": "./nginx.site_avail.conf"}} */
-    #[serde_as(as = "Option<indexmap::IndexMap<String, indexmap::IndexMap<DisplayFromStr, KindAndLocation>>>")]
-    pub vendor: Option<indexmap::IndexMap<String, indexmap::IndexMap<usize, KindAndLocation>>>,
+    pub vendor: Option<indexmap::IndexMap<String, indexmap::IndexMap<Os, KindAndLocation>>>,
     pub mounts: Option<indexmap::IndexMap<String, KindAndLocation>>,
 }
 
 /// OSs from https://github.com/rust-lang/rust/blob/1.77.0/library/std/src/env.rs#L947-L961
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, strum::AsRefStr)]
+#[serde(rename_all = "lowercase")]
 pub enum Os {
     Linux,
     Macos,
@@ -120,7 +118,6 @@ pub struct VendorVersion {
     pub version: Option<String>,
 }
 
-#[serde_as]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct KindAndLocation {
     pub kind: String,
@@ -240,11 +237,11 @@ mod tests {
                     version: None,
                     uri: String::from("my_app.verman.io"),
                     vendor: {
-                        let mut vendor = indexmap::IndexMap::<String, indexmap::IndexMap::<usize, KindAndLocation>>::new();
+                        let mut vendor = indexmap::IndexMap::<String, indexmap::IndexMap::<Os, KindAndLocation>>::new();
                         vendor.insert(String::from("nginx"), {
-                            let mut os_to_kind_and_location = indexmap::IndexMap::<usize, KindAndLocation>::new();
-                            os_to_kind_and_location.insert(Os::Windows as usize, KindAndLocation { kind: String::from("server_block"), location: String::from("./win_nginx.site_avail.conf") });
-                            os_to_kind_and_location.insert(Os::Unspecified as usize, KindAndLocation { kind: String::from("server_block"), location: String::from("./nginx.site_avail.conf") });
+                            let mut os_to_kind_and_location = indexmap::IndexMap::<Os, KindAndLocation>::new();
+                            os_to_kind_and_location.insert(Os::Windows, KindAndLocation { kind: String::from("server_block"), location: String::from("./win_nginx.site_avail.conf") });
+                            os_to_kind_and_location.insert(Os::Unspecified, KindAndLocation { kind: String::from("server_block"), location: String::from("./nginx.site_avail.conf") });
                             os_to_kind_and_location
                         });
                         Some(vendor)
@@ -278,8 +275,9 @@ mod tests {
             ],
         };
         let root: Root = serde_json::from_str(&VERMAN_JSON).unwrap();
-        let toml_data = toml::to_string(&config).unwrap();
-        println!("{}", toml_data);
+        let toml_str = toml::to_string(&config).unwrap();
+        println!("{}", toml_str);
+        std::fs::write("verman.toml", toml_str).expect("Could not write to file!");
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
             serde_json::to_string(&root).unwrap()

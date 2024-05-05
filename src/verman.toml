@@ -1,0 +1,71 @@
+name = "verman-schema-rs"
+version = "0.0.1"
+license = "(Apache-2.0 OR MIT)"
+homepage = "https://verman.io"
+repo = "https://github.com/verman-io"
+authors = [""]
+
+[[stack.database]]
+kind = "sql"
+
+[[stack.application_server]]
+kind = "python"
+versions = ["~2.7", "~3.6", "~3.13"]
+server_priority = ["Waitress", "mod_wsgi", "uvicorn"]
+
+[[stack.application_server]]
+kind = "ruby"
+
+[stack_state.database]
+kind = "sql"
+install = "always"
+start = "always"
+
+[stack_state.application_server]
+install = "always"
+start = "always"
+
+[stack_state.routing]
+install = "always"
+start = "always"
+
+[[stack_routing]]
+name = "my_name.verman.io"
+protocol = "https"
+certificate_vendor = "LetsEncrypt"
+
+[[component]]
+src = "./python_api_folder/"
+kind = "python"
+version = ">3.8"
+uri = "http://localhost:${env.PYTHON_API_PORT}"
+
+[[component]]
+src = "./ruby_api_folder/"
+kind = "ruby"
+version = ">3.1.2, <3.2"
+uri = '${if(WIN32) { "\\.\pipe\PipeName" } else { "unix:///var/run/my-socket.sock" }}'
+
+[[component]]
+kind = "routing"
+uri = "my_app.verman.io"
+
+[component.vendor.nginx.windows]
+kind = "server_block"
+location = "./win_nginx.site_avail.conf"
+
+[component.vendor.nginx.unspecified]
+kind = "server_block"
+location = "./nginx.site_avail.conf"
+
+[component.mounts."/api/py"]
+kind = "python"
+location = "${stack.components[.kind==\"python\"].uri}"
+
+[component.mounts."/api/ruby"]
+kind = "ruby"
+location = "${stack.components[.kind==\"ruby\"].uri}"
+
+[component.mounts."/"]
+kind = "static"
+location = "${env.WWWROOT}"

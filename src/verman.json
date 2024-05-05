@@ -90,11 +90,11 @@
       "uri": "my_app.verman.io",
       "vendor": {
         "nginx": {
-          "9": {
+          "windows": {
             "kind": "server_block",
             "location": "./win_nginx.site_avail.conf"
           },
-          "10": {
+          "linux": {
             "kind": "server_block",
             "location": "./nginx.site_avail.conf"
           }
