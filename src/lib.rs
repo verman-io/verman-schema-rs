@@ -2,11 +2,9 @@ extern crate serde;
 
 use serde_derive::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ValXorIfThenElse<T> {
-    #[default]
-    None,
     Val(T),
     IfThenElse {
         #[serde(rename = "if")]
@@ -15,6 +13,12 @@ pub enum ValXorIfThenElse<T> {
         #[serde(rename = "else")]
         else_field: Option<T>,
     },
+}
+
+impl<T: Default> Default for ValXorIfThenElse<T> {
+    fn default() -> Self {
+        ValXorIfThenElse::Val(T::default())
+    }
 }
 
 /* union StringOrT<T> {
@@ -38,7 +42,7 @@ impl From<&str> for ValXorIfThenElse<String> {
         ValXorIfThenElse::<String>::Val(s.into())
     }
 }
-impl <T>From<T> for ValXorIfThenElse<T> {
+impl<T> From<T> for ValXorIfThenElse<T> {
     fn from(t: T) -> Self {
         ValXorIfThenElse::<T>::Val(t)
     }
@@ -46,11 +50,12 @@ impl <T>From<T> for ValXorIfThenElse<T> {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Root {
+    #[serde(default = "default_name")]
     pub name: ValXorIfThenElse<String>,
-    pub version: ValXorIfThenElse<String>,
-    pub license: String,
-    pub homepage: String,
-    pub repo: String,
+    pub version: Option<ValXorIfThenElse<String>>,
+    pub license: Option<String>,
+    pub homepage: Option<String>,
+    pub repo: Option<String>,
     pub authors: Vec<String>,
 
     pub stack: indexmap::IndexMap<String, Vec<ServerConfiguration>>,
@@ -58,6 +63,13 @@ pub struct Root {
     pub stack_routing: Vec<ProtocolConfiguration>,
 
     pub component: Vec<Component>,
+    /// environment variables. Priority: `ServerConfiguration` | `Component`; `Root`; system.
+    pub env_vars: Option<indexmap::IndexMap<String, String>>,
+}
+
+fn default_name() -> ValXorIfThenElse<String> {
+    const NAME: &'static str = "verman-root";
+    ValXorIfThenElse::<String>::Val(String::from(NAME))
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -104,15 +116,17 @@ pub struct ServerConfiguration {
     pub kind: String,
     pub versions: Option<Vec<String>>,
     pub server_priority: Option<Vec<String>>,
+    /// environment variables. Priority: `ServerConfiguration` | `component`; `Root`; system.
+    pub env_vars: Option<indexmap::IndexMap<String, String>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProtocolConfiguration {
     /// E.g., "localhost" | "127.0.0.1" | "::1" | "my_name.verman.io"
-    pub name: ValXorIfThenElse<String>,
+    pub name: Option<ValXorIfThenElse<String>>,
 
     /// E.g., "https" | "http"
-    pub protocol: ValXorIfThenElse<String>,
+    pub protocol: Option<ValXorIfThenElse<String>>,
 
     /// E.g., "LetsEncrypt"
     pub certificate_vendor: Option<ValXorIfThenElse<String>>,
@@ -122,13 +136,15 @@ pub struct ProtocolConfiguration {
 #[serde(rename_all = "snake_case")]
 pub struct Component {
     pub src_uri: Option<ValXorIfThenElse<String>>,
-    pub dst_uri: ValXorIfThenElse<String>,
+    pub dst_uri: Option<ValXorIfThenElse<String>>,
     pub constraints: Vec<Constraint>,
+    /// environment variables. Priority: `ServerConfiguration` | `Component`; `Root`; system.
+    pub env_vars: Option<indexmap::IndexMap<String, String>>,
     pub vendor: Option<indexmap::IndexMap<String, indexmap::IndexMap<Os, KindAndUri>>>,
     pub mounts: Option<indexmap::IndexMap<String, KindAndUri>>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct KindAndUri {
     pub kind: ValXorIfThenElse<String>,
     pub uri: ValXorIfThenElse<String>,
@@ -143,7 +159,7 @@ pub struct Constraint {
 }
 
 /// OSs from https://github.com/rust-lang/rust/blob/1.77.0/library/std/src/env.rs#L947-L961
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Os {
     Linux,
@@ -157,18 +173,13 @@ pub enum Os {
     Android,
     Windows,
     /// Sometimes useful for all OSs
+    #[default]
     Unspecified,
-}
-
-impl Default for Os {
-    fn default() -> Self {
-        Os::Unspecified
-    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VendorVersion {
-    pub vendor: ValXorIfThenElse<String>,
+    pub vendor: Option<ValXorIfThenElse<String>>,
     pub version: Option<ValXorIfThenElse<String>>,
 }
 
@@ -187,10 +198,10 @@ mod tests {
     fn it_serdes() {
         let config = Root {
             name: String::from(env!("CARGO_PKG_NAME")).into(),
-            version: String::from(env!("CARGO_PKG_VERSION")).into(),
-            license: String::from("(Apache-2.0 OR MIT)"),
-            homepage: String::from("https://verman.io"),
-            repo: String::from("https://github.com/verman-io"),
+            version: Some(String::from(env!("CARGO_PKG_VERSION")).into()),
+            license: Some(String::from("(Apache-2.0 OR MIT)")),
+            homepage: Some(String::from("https://verman.io")),
+            repo: Some(String::from("https://github.com/verman-io")),
             authors: vec![String::from(env!("CARGO_PKG_AUTHORS"))],
 
             stack_state: {
@@ -236,6 +247,7 @@ mod tests {
                         kind: String::from("sql"),
                         versions: None,
                         server_priority: None,
+                        env_vars: None,
                     }],
                 );
                 stack.insert(
@@ -253,47 +265,50 @@ mod tests {
                                 String::from("mod_wsgi"),
                                 String::from("uvicorn"),
                             ]),
+                            env_vars: None,
                         },
                         ServerConfiguration {
                             kind: String::from("ruby"),
                             versions: None,
                             server_priority: None,
+                            env_vars: None,
                         },
                     ],
                 );
                 stack
             },
             stack_routing: vec![ProtocolConfiguration {
-                name: String::from("my_name.verman.io").into(),
-                protocol: String::from("https").into(),
+                name: Some(String::from("my_name.verman.io").into()),
+                protocol: Some(String::from("https").into()),
                 certificate_vendor: Some(String::from("LetsEncrypt").into()),
             }],
             component: vec![
                 Component {
                     src_uri: Some(String::from("file://python_api_folder/").into()),
-                    dst_uri: String::from("http://localhost:${env.PYTHON_API_PORT}").into(),
+                    dst_uri: Some(String::from("http://localhost:${env.PYTHON_API_PORT}").into()),
                     constraints: vec![
                         Constraint {
                             kind: String::from("lang"),
                             required_variant: Some(String::from("python")),
-                            required_version: None
+                            required_version: None,
                         },
                         Constraint {
                             kind: String::from("OS"),
                             required_variant: None,
-                            required_version: None
+                            required_version: None,
                         },
                     ],
+                    env_vars: None,
                     vendor: None,
                     mounts: None,
                 },
                 Component {
                     src_uri: Some(String::from("file://ruby_api_folder/").into()),
-                    dst_uri: ValXorIfThenElse::IfThenElse {
+                    dst_uri: Some(ValXorIfThenElse::IfThenElse {
                         if_field: String::from("OS == \"windows\""),
                         then: String::from("\"\\\\.\\pipe\\PipeName\""),
-                        else_field: Some(String::from("\"unix:///var/run/my-socket.sock\""))
-                    },
+                        else_field: Some(String::from("\"unix:///var/run/my-socket.sock\"")),
+                    }),
                     constraints: vec![
                         Constraint {
                             kind: String::from("lang"),
@@ -303,21 +318,36 @@ mod tests {
                         Constraint {
                             kind: String::from("OS"),
                             required_variant: Some(String::from("${\"linux\" || \"windows\"}")),
-                            required_version: None
+                            required_version: None,
                         },
                     ],
+                    env_vars: None,
                     vendor: None,
                     mounts: None,
                 },
                 Component {
                     src_uri: None,
-                    dst_uri: String::from("my_app.verman.io").into(),
+                    dst_uri: Some(String::from("my_app.verman.io").into()),
                     vendor: {
-                        let mut vendor = indexmap::IndexMap::<String, indexmap::IndexMap::<Os, KindAndUri>>::new();
+                        let mut vendor =
+                            indexmap::IndexMap::<String, indexmap::IndexMap<Os, KindAndUri>>::new();
                         vendor.insert(String::from("nginx"), {
-                            let mut os_to_kind_and_location = indexmap::IndexMap::<Os, KindAndUri>::new();
-                            os_to_kind_and_location.insert(Os::Windows, KindAndUri { kind: String::from("server_block").into(), uri: String::from("file://win_nginx.site_avail.conf").into() });
-                            os_to_kind_and_location.insert(Os::Linux, KindAndUri { kind: String::from("server_block").into(), uri: String::from("file://nginx.site_avail.conf").into() });
+                            let mut os_to_kind_and_location =
+                                indexmap::IndexMap::<Os, KindAndUri>::new();
+                            os_to_kind_and_location.insert(
+                                Os::Windows,
+                                KindAndUri {
+                                    kind: String::from("server_block").into(),
+                                    uri: String::from("file://win_nginx.site_avail.conf").into(),
+                                },
+                            );
+                            os_to_kind_and_location.insert(
+                                Os::Linux,
+                                KindAndUri {
+                                    kind: String::from("server_block").into(),
+                                    uri: String::from("file://nginx.site_avail.conf").into(),
+                                },
+                            );
                             os_to_kind_and_location
                         });
                         Some(vendor)
@@ -328,14 +358,16 @@ mod tests {
                             String::from("/api/py"),
                             KindAndUri {
                                 kind: String::from("python").into(),
-                                uri: String::from("${stack.components[.kind==\"python\"].dst_uri}").into(),
+                                uri: String::from("${stack.components[.kind==\"python\"].dst_uri}")
+                                    .into(),
                             },
                         );
                         mounts.insert(
                             String::from("/api/ruby"),
                             KindAndUri {
                                 kind: String::from("ruby").into(),
-                                uri: String::from("${stack.components[.kind==\"ruby\"].dst_uri}").into(),
+                                uri: String::from("${stack.components[.kind==\"ruby\"].dst_uri}")
+                                    .into(),
                             },
                         );
                         mounts.insert(
@@ -350,10 +382,23 @@ mod tests {
                     constraints: vec![Constraint {
                         kind: String::from("routing"),
                         required_variant: None,
-                        required_version: None
-                    }]
+                        required_version: None,
+                    }],
+                    env_vars: {
+                        let mut env = indexmap::IndexMap::<String, String>::new();
+                        env.insert(
+                            String::from("COMPONENT_NAME"),
+                            String::from("mount_component"),
+                        );
+                        Some(env)
+                    },
                 },
             ],
+            env_vars: {
+                let mut env = indexmap::IndexMap::<String, String>::new();
+                env.insert(String::from("DEBUG_ROOT"), String::from("true"));
+                Some(env)
+            },
         };
         // std::fs::write("./src/verman.json", serde_json::to_string(&config).unwrap()).unwrap();
         let root_from_json: Root = serde_json::from_str(&VERMAN_JSON).unwrap();

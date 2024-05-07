@@ -68,6 +68,9 @@ dst_uri = "my_app.verman.io"
 [[component.constraints]]
 kind = "routing"
 
+[component.env_vars]
+COMPONENT_NAME = "mount_component"
+
 [component.vendor.nginx.windows]
 kind = "server_block"
 uri = "file://win_nginx.site_avail.conf"
@@ -87,3 +90,6 @@ uri = "${stack.components[.kind==\"ruby\"].dst_uri}"
 [component.mounts."/"]
 kind = "static"
 uri = "file://${env.WWWROOT}"
+
+[env_vars]
+DEBUG_ROOT = "true"

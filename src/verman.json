@@ -12,7 +12,8 @@
       {
         "kind": "sql",
         "versions": null,
-        "server_priority": null
+        "server_priority": null,
+        "env_vars": null
       }
     ],
     "application_server": [
@@ -27,12 +28,14 @@
           "Waitress",
           "mod_wsgi",
           "uvicorn"
-        ]
+        ],
+        "env_vars": null
       },
       {
         "kind": "ruby",
         "versions": null,
-        "server_priority": null
+        "server_priority": null,
+        "env_vars": null
       }
     ]
   },
@@ -82,6 +85,7 @@
           "required_version": null
         }
       ],
+      "env_vars": null,
       "vendor": null,
       "mounts": null
     },
@@ -104,6 +108,7 @@
           "required_version": null
         }
       ],
+      "env_vars": null,
       "vendor": null,
       "mounts": null
     },
@@ -117,6 +122,9 @@
           "required_version": null
         }
       ],
+      "env_vars": {
+        "COMPONENT_NAME": "mount_component"
+      },
       "vendor": {
         "nginx": {
           "windows": {
@@ -144,5 +152,8 @@
         }
       }
     }
-  ]
+  ],
+  "env_vars": {
+    "DEBUG_ROOT": "true"
+  }
 }
