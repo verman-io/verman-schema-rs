@@ -42,9 +42,14 @@ uri = "http://localhost:${env.PYTHON_API_PORT}"
 
 [[component]]
 src = "./ruby_api_folder/"
-kind = "ruby"
-version = ">3.1.2, <3.2"
-uri = '${if(WIN32) { "\\.\pipe\PipeName" } else { "unix:///var/run/my-socket.sock" }}'
+constraint = [
+    { kind = "lang", required_variant = "ruby", required_version = ">3.1.2, <3.2" },
+    { kind = "os", required_variant = "undecided" }
+]
+[component.uri]
+if = ["os", "==", "windows"]
+then = ["\\\\.\\pipe\\PipeName"]
+else = ["unix:///var/run/my-socket.sock"]
 
 [[component]]
 kind = "routing"
