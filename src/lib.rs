@@ -1,47 +1,12 @@
 extern crate serde;
 
 use serde_derive::{Deserialize, Serialize};
-use std::fmt;
 
-impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for ValXorIfThenElse<T> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de>,
-    {
-        struct StringOrStruct<T>(std::marker::PhantomData<fn() -> T>);
-
-        impl<'de, T: serde::Deserialize<'de>> serde::de::Visitor<'de> for StringOrStruct<T> {
-            type Value = ValXorIfThenElse<T>;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("string or structure")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<ValXorIfThenElse<T>, E>
-                where
-                    E: serde::de::Error,
-            {
-                Ok(ValXorIfThenElse::Val(value.to_owned()))
-            }
-
-            fn visit_map<A>(self, map: A) -> Result<ValXorIfThenElse<T>, A::Error>
-                where
-                    A: serde::de::MapAccess<'de>,
-            {
-                Ok(ValXorIfThenElse::IfThenElse(serde::Deserialize::deserialize(
-                    serde::de::value::MapAccessDeserializer::new(map),
-                )?))
-            }
-        }
-
-        deserializer.deserialize_any(StringOrStruct(std::marker::PhantomData))
-    }
-}
-
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deserialize_with = "des_val_xor_if_then_else")]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum ValXorIfThenElse<T> {
+    #[default]
+    None,
     Val(T),
     IfThenElse {
         #[serde(rename = "if")]
@@ -52,24 +17,10 @@ pub enum ValXorIfThenElse<T> {
     },
 }
 
-union StringOrT<T> {
+/* union StringOrT<T> {
     string: std::mem::ManuallyDrop<String>,
     t: std::mem::ManuallyDrop<T>
-}
-
-impl Default for ValXorIfThenElse<String> {
-    fn default() -> Self {
-        ValXorIfThenElse::<String>::IfThenElse {
-            if_field: String::from("true"), then: String::from("true"), else_field: None
-        }
-    }
-}
-
-/*impl <T>Into<ValXorIfThenElse<std::string::String>> for ValXorIfThenElse<T> {
-    fn into(self) -> ValXorIfThenElse<String> {
-        ValXorIfThenElse::Val(self)
-    }
-}*/
+} */
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParseValXorIfThenElseError;
@@ -168,15 +119,27 @@ pub struct ProtocolConfiguration {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct Component {
-    pub src: Option<ValXorIfThenElse<String>>,
-    pub kind: ValXorIfThenElse<String>,
-    pub version: Option<ValXorIfThenElse<String>>,
-    pub uri: ValXorIfThenElse<String>,
-    /* `vendor` example: {"nginx": {"windows": "./win_nginx.site_avail.conf",
-    "_": "./nginx.site_avail.conf"}} */
+    pub src_uri: Option<ValXorIfThenElse<String>>,
+    pub dst_uri: ValXorIfThenElse<String>,
+    pub constraints: Vec<Constraint>,
     pub vendor: Option<indexmap::IndexMap<String, indexmap::IndexMap<Os, KindAndUri>>>,
     pub mounts: Option<indexmap::IndexMap<String, KindAndUri>>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct KindAndUri {
+    pub kind: ValXorIfThenElse<String>,
+    pub uri: ValXorIfThenElse<String>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct Constraint {
+    pub kind: String,
+    pub required_variant: Option<String>,
+    pub required_version: Option<String>,
 }
 
 /// OSs from https://github.com/rust-lang/rust/blob/1.77.0/library/std/src/env.rs#L947-L961
@@ -207,12 +170,6 @@ impl Default for Os {
 pub struct VendorVersion {
     pub vendor: ValXorIfThenElse<String>,
     pub version: Option<ValXorIfThenElse<String>>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct KindAndUri {
-    pub kind: ValXorIfThenElse<String>,
-    pub uri: ValXorIfThenElse<String>,
 }
 
 /* pub fn eval_field(s: Box<dyn Into<String>>) -> String {
@@ -313,32 +270,54 @@ mod tests {
             }],
             component: vec![
                 Component {
-                    src: Some(String::from("./python_api_folder/").into()),
-                    kind: String::from("python").into(),
-                    version: Some(String::from(">3.8").into()),
-                    uri: String::from("http://localhost:${env.PYTHON_API_PORT}").into(),
+                    src_uri: Some(String::from("file://python_api_folder/").into()),
+                    dst_uri: String::from("http://localhost:${env.PYTHON_API_PORT}").into(),
+                    constraints: vec![
+                        Constraint {
+                            kind: String::from("lang"),
+                            required_variant: Some(String::from("python")),
+                            required_version: None
+                        },
+                        Constraint {
+                            kind: String::from("OS"),
+                            required_variant: None,
+                            required_version: None
+                        },
+                    ],
                     vendor: None,
                     mounts: None,
                 },
                 Component {
-                    src: Some(String::from("./ruby_api_folder/").into()),
-                    kind: String::from("ruby").into(),
-                    version: Some(String::from(">3.1.2, <3.2").into()),
-                    uri: String::from("${if(WIN32) { \"\\\\.\\pipe\\PipeName\" } else { \"unix:///var/run/my-socket.sock\" }}").into(),
+                    src_uri: Some(String::from("file://ruby_api_folder/").into()),
+                    dst_uri: ValXorIfThenElse::IfThenElse {
+                        if_field: String::from("OS == \"windows\""),
+                        then: String::from("\"\\\\.\\pipe\\PipeName\""),
+                        else_field: Some(String::from("\"unix:///var/run/my-socket.sock\""))
+                    },
+                    constraints: vec![
+                        Constraint {
+                            kind: String::from("lang"),
+                            required_variant: Some(String::from("ruby")),
+                            required_version: Some(String::from(">3.1.2, <3.2")),
+                        },
+                        Constraint {
+                            kind: String::from("OS"),
+                            required_variant: Some(String::from("${\"linux\" || \"windows\"}")),
+                            required_version: None
+                        },
+                    ],
                     vendor: None,
                     mounts: None,
                 },
                 Component {
-                    src: None,
-                    kind: String::from("routing").into(),
-                    version: None,
-                    uri: String::from("my_app.verman.io").into(),
+                    src_uri: None,
+                    dst_uri: String::from("my_app.verman.io").into(),
                     vendor: {
                         let mut vendor = indexmap::IndexMap::<String, indexmap::IndexMap::<Os, KindAndUri>>::new();
                         vendor.insert(String::from("nginx"), {
                             let mut os_to_kind_and_location = indexmap::IndexMap::<Os, KindAndUri>::new();
-                            os_to_kind_and_location.insert(Os::Windows, KindAndUri { kind: String::from("server_block").into(), uri: String::from("./win_nginx.site_avail.conf").into() });
-                            os_to_kind_and_location.insert(Os::Linux, KindAndUri { kind: String::from("server_block").into(), uri: String::from("./nginx.site_avail.conf").into() });
+                            os_to_kind_and_location.insert(Os::Windows, KindAndUri { kind: String::from("server_block").into(), uri: String::from("file://win_nginx.site_avail.conf").into() });
+                            os_to_kind_and_location.insert(Os::Linux, KindAndUri { kind: String::from("server_block").into(), uri: String::from("file://nginx.site_avail.conf").into() });
                             os_to_kind_and_location
                         });
                         Some(vendor)
@@ -349,14 +328,14 @@ mod tests {
                             String::from("/api/py"),
                             KindAndUri {
                                 kind: String::from("python").into(),
-                                uri: String::from("${stack.components[.kind==\"python\"].uri}").into(),
+                                uri: String::from("${stack.components[.kind==\"python\"].dst_uri}").into(),
                             },
                         );
                         mounts.insert(
                             String::from("/api/ruby"),
                             KindAndUri {
                                 kind: String::from("ruby").into(),
-                                uri: String::from("${stack.components[.kind==\"ruby\"].uri}").into(),
+                                uri: String::from("${stack.components[.kind==\"ruby\"].dst_uri}").into(),
                             },
                         );
                         mounts.insert(
@@ -368,13 +347,18 @@ mod tests {
                         );
                         Some(mounts)
                     },
+                    constraints: vec![Constraint {
+                        kind: String::from("routing"),
+                        required_variant: None,
+                        required_version: None
+                    }]
                 },
             ],
         };
+        // std::fs::write("./src/verman.json", serde_json::to_string(&config).unwrap()).unwrap();
         let root_from_json: Root = serde_json::from_str(&VERMAN_JSON).unwrap();
+        // std::fs::write("./src/verman.toml", toml::to_string(&config).unwrap()).unwrap();
         let root_from_toml: Root = toml::from_str(&VERMAN_TOML).unwrap();
-        /* std::fs::write("./src/verman.toml", toml::to_string(&config).unwrap())
-        .expect("Could not write to file!"); */
         assert_eq!(root_from_toml, root_from_json);
         assert_eq!(
             serde_json::to_string(&config).unwrap(),

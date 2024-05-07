@@ -68,50 +68,79 @@
   ],
   "component": [
     {
-      "src": "./python_api_folder/",
-      "kind": "python",
-      "version": ">3.8",
-      "uri": "http://localhost:${env.PYTHON_API_PORT}",
+      "src_uri": "file://python_api_folder/",
+      "dst_uri": "http://localhost:${env.PYTHON_API_PORT}",
+      "constraints": [
+        {
+          "kind": "lang",
+          "required_variant": "python",
+          "required_version": null
+        },
+        {
+          "kind": "OS",
+          "required_variant": null,
+          "required_version": null
+        }
+      ],
       "vendor": null,
       "mounts": null
     },
     {
-      "src": "./ruby_api_folder/",
-      "kind": "ruby",
-      "version": ">3.1.2, <3.2",
-      "uri": "${if(WIN32) { \"\\\\.\\pipe\\PipeName\" } else { \"unix:///var/run/my-socket.sock\" }}",
+      "src_uri": "file://ruby_api_folder/",
+      "dst_uri": {
+        "if": "OS == \"windows\"",
+        "then": "\"\\\\.\\pipe\\PipeName\"",
+        "else": "\"unix:///var/run/my-socket.sock\""
+      },
+      "constraints": [
+        {
+          "kind": "lang",
+          "required_variant": "ruby",
+          "required_version": ">3.1.2, <3.2"
+        },
+        {
+          "kind": "OS",
+          "required_variant": "${\"linux\" || \"windows\"}",
+          "required_version": null
+        }
+      ],
       "vendor": null,
       "mounts": null
     },
     {
-      "src": null,
-      "kind": "routing",
-      "version": null,
-      "uri": "my_app.verman.io",
+      "src_uri": null,
+      "dst_uri": "my_app.verman.io",
+      "constraints": [
+        {
+          "kind": "routing",
+          "required_variant": null,
+          "required_version": null
+        }
+      ],
       "vendor": {
         "nginx": {
           "windows": {
             "kind": "server_block",
-            "location": "./win_nginx.site_avail.conf"
+            "uri": "file://win_nginx.site_avail.conf"
           },
           "linux": {
             "kind": "server_block",
-            "location": "./nginx.site_avail.conf"
+            "uri": "file://nginx.site_avail.conf"
           }
         }
       },
       "mounts": {
         "/api/py": {
           "kind": "python",
-          "location": "${stack.components[.kind==\"python\"].uri}"
+          "uri": "${stack.components[.kind==\"python\"].dst_uri}"
         },
         "/api/ruby": {
           "kind": "ruby",
-          "location": "${stack.components[.kind==\"ruby\"].uri}"
+          "uri": "${stack.components[.kind==\"ruby\"].dst_uri}"
         },
         "/": {
           "kind": "static",
-          "location": "${env.WWWROOT}"
+          "uri": "file://${env.WWWROOT}"
         }
       }
     }

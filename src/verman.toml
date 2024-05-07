@@ -35,42 +35,55 @@ protocol = "https"
 certificate_vendor = "LetsEncrypt"
 
 [[component]]
-src = "./python_api_folder/"
-kind = "python"
-version = ">3.8"
-uri = "http://localhost:${env.PYTHON_API_PORT}"
+src_uri = "file://python_api_folder/"
+dst_uri = "http://localhost:${env.PYTHON_API_PORT}"
+
+[[component.constraints]]
+kind = "lang"
+required_variant = "python"
+
+[[component.constraints]]
+kind = "OS"
 
 [[component]]
-src = "./ruby_api_folder/"
-constraint = [
-    { kind = "lang", required_variant = "ruby", required_version = ">3.1.2, <3.2" },
-    { kind = "os", required_variant = "undecided" }
-]
-[component.uri]
-if = ["os", "==", "windows"]
-then = ["\\\\.\\pipe\\PipeName"]
-else = ["unix:///var/run/my-socket.sock"]
+src_uri = "file://ruby_api_folder/"
+
+[component.dst_uri]
+if = "OS == \"windows\""
+then = '"\\.\pipe\PipeName"'
+else = "\"unix:///var/run/my-socket.sock\""
+
+[[component.constraints]]
+kind = "lang"
+required_variant = "ruby"
+required_version = ">3.1.2, <3.2"
+
+[[component.constraints]]
+kind = "OS"
+required_variant = "${\"linux\" || \"windows\"}"
 
 [[component]]
+dst_uri = "my_app.verman.io"
+
+[[component.constraints]]
 kind = "routing"
-uri = "my_app.verman.io"
 
 [component.vendor.nginx.windows]
 kind = "server_block"
-location = "./win_nginx.site_avail.conf"
+uri = "file://win_nginx.site_avail.conf"
 
 [component.vendor.nginx.linux]
 kind = "server_block"
-location = "./nginx.site_avail.conf"
+uri = "file://nginx.site_avail.conf"
 
 [component.mounts."/api/py"]
 kind = "python"
-location = "${stack.components[.kind==\"python\"].uri}"
+uri = "${stack.components[.kind==\"python\"].dst_uri}"
 
 [component.mounts."/api/ruby"]
 kind = "ruby"
-location = "${stack.components[.kind==\"ruby\"].uri}"
+uri = "${stack.components[.kind==\"ruby\"].dst_uri}"
 
 [component.mounts."/"]
 kind = "static"
-location = "${env.WWWROOT}"
+uri = "file://${env.WWWROOT}"
