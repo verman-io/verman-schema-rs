@@ -86,7 +86,6 @@
         }
       ],
       "env_vars": null,
-      "vendor": null,
       "mounts": null
     },
     {
@@ -109,7 +108,6 @@
         }
       ],
       "env_vars": null,
-      "vendor": null,
       "mounts": null
     },
     {
@@ -125,32 +123,29 @@
       "env_vars": {
         "COMPONENT_NAME": "mount_component"
       },
-      "vendor": {
-        "nginx": {
-          "windows": {
-            "kind": "server_block",
-            "uri": "file://win_nginx.site_avail.conf"
-          },
-          "linux": {
-            "kind": "server_block",
-            "uri": "file://nginx.site_avail.conf"
-          }
-        }
-      },
-      "mounts": {
-        "/api/py": {
-          "kind": "python",
-          "uri": "${stack.components[.kind==\"python\"].dst_uri}"
+      "mounts": [
+        {
+          "when": "NOT EXISTS(ISPREFIXOF(\"nginx::\", ${.mounts[].action}))",
+          "uri": "/api/foo",
+          "src_uri": "http://localhost:8080",
+          "action": "mount::expose",
+          "action_args": null
         },
-        "/api/ruby": {
-          "kind": "ruby",
-          "uri": "${stack.components[.kind==\"ruby\"].dst_uri}"
+        {
+          "when": "BUILD_TIME > 2024",
+          "uri": "/api/demo",
+          "src_uri": null,
+          "action": "mount::expose",
+          "action_args": null
         },
-        "/": {
-          "kind": "static",
-          "uri": "file://${env.WWWROOT}"
+        {
+          "when": "OS == \"windows\"",
+          "uri": "file://win_nginx.conf",
+          "src_uri": null,
+          "action": "nginx::make_site_available",
+          "action_args": "{ \"upsert\": true }"
         }
-      }
+      ]
     }
   ],
   "env_vars": {

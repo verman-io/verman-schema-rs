@@ -71,25 +71,22 @@ kind = "routing"
 [component.env_vars]
 COMPONENT_NAME = "mount_component"
 
-[component.vendor.nginx.windows]
-kind = "server_block"
-uri = "file://win_nginx.site_avail.conf"
+[[component.mounts]]
+when = "NOT EXISTS(ISPREFIXOF(\"nginx::\", ${.mounts[].action}))"
+uri = "/api/foo"
+src_uri = "http://localhost:8080"
+action = "mount::expose"
 
-[component.vendor.nginx.linux]
-kind = "server_block"
-uri = "file://nginx.site_avail.conf"
+[[component.mounts]]
+when = "BUILD_TIME > 2024"
+uri = "/api/demo"
+action = "mount::expose"
 
-[component.mounts."/api/py"]
-kind = "python"
-uri = "${stack.components[.kind==\"python\"].dst_uri}"
-
-[component.mounts."/api/ruby"]
-kind = "ruby"
-uri = "${stack.components[.kind==\"ruby\"].dst_uri}"
-
-[component.mounts."/"]
-kind = "static"
-uri = "file://${env.WWWROOT}"
+[[component.mounts]]
+when = "OS == \"windows\""
+uri = "file://win_nginx.conf"
+action = "nginx::make_site_available"
+action_args = "{ \"upsert\": true }"
 
 [env_vars]
 DEBUG_ROOT = "true"
