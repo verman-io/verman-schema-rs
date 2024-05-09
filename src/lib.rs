@@ -1,9 +1,16 @@
 extern crate serde;
+#[macro_use]
+extern crate lazy_static;
 
 use serde_derive::{Deserialize, Serialize};
 
-/// TODO: lazy_static
-// const BUILD_TIME: std::time::SystemTime = std::time::SystemTime::now();
+pub const ARCH: &'static str = std::env::consts::ARCH;
+pub const FAMILY: &'static str = std::env::consts::FAMILY;
+pub const OS: &'static str = std::env::consts::OS;
+
+lazy_static! {
+    pub static ref BUILD_TIME: std::time::SystemTime = std::time::SystemTime::now();
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -70,7 +77,8 @@ pub struct Root {
     pub env_vars: Option<indexmap::IndexMap<String, String>>,
 }
 
-const fn default_name() -> ValXorIfThenElse<std::borrow::Cow<'static, str>, std::borrow::Cow<'static, str>> {
+const fn default_name(
+) -> ValXorIfThenElse<std::borrow::Cow<'static, str>, std::borrow::Cow<'static, str>> {
     const NAME: &'static str = "verman-root";
     ValXorIfThenElse::Val(std::borrow::Cow::Borrowed(NAME))
 }
@@ -154,8 +162,8 @@ pub struct Component {
 #[serde(rename_all = "snake_case")]
 pub struct Mount {
     pub when: String,
-    pub uri: Option<String>,
-    pub src_uri: Option<String>,
+    pub uri: Option<ValXorIfThenElse<String, String>>,
+    pub src_uri: Option<ValXorIfThenElse<String, String>>,
     pub action: String,
     // Future: enable an IDL (like JSON-schema) to validate these args
     // Future: allow this IDL to be provided by URI
@@ -202,6 +210,7 @@ pub struct VendorVersion {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     const VERMAN_JSON: &'static str = include_str!("verman.json");
     const VERMAN_TOML: &'static str = include_str!("verman.toml");
@@ -339,28 +348,30 @@ mod tests {
                     src_uri: None,
                     dst_uri: Some(String::from("my_app.verman.io").into()),
                     mounts: Some(vec![
-                            Mount {
-                                when: String::from("NOT EXISTS(ISPREFIXOF(\"nginx::\", ${.mounts[].action}))"),
-                                uri: Some(String::from("/api/foo")),
-                                src_uri: Some(String::from("http://localhost:8080")),
-                                action: String::from("mount::expose"),
-                                action_args: None
-                            },
-                            Mount {
-                                when: String::from("BUILD_TIME > 2024"),
-                                uri: Some(String::from("/api/demo")),
-                                src_uri: None, // 404
-                                action: String::from("mount::expose"),
-                                action_args: None
-                            },
-                            Mount {
-                                when: String::from("OS == \"windows\""),
-                                uri: Some(String::from("file://win_nginx.conf")),
-                                src_uri: None,
-                                action: String::from("nginx::make_site_available"),
-                                action_args: Some("{ \"upsert\": true }".into()),
-                            }
-                        ]),
+                        Mount {
+                            when: String::from(
+                                "NOT EXISTS(ISPREFIXOF(\"nginx::\", ${.mounts[].action}))",
+                            ),
+                            uri: Some(String::from("/api/foo").into()),
+                            src_uri: Some(String::from("http://localhost:8080").into()),
+                            action: String::from("mount::expose"),
+                            action_args: None,
+                        },
+                        Mount {
+                            when: String::from("BUILD_TIME > 2024"),
+                            uri: Some(String::from("/api/demo").into()),
+                            src_uri: None, // 404
+                            action: String::from("mount::expose"),
+                            action_args: None,
+                        },
+                        Mount {
+                            when: String::from("OS == \"windows\""),
+                            uri: Some(String::from("file://win_nginx.conf").into()),
+                            src_uri: None,
+                            action: String::from("nginx::make_site_available"),
+                            action_args: Some(json!({ "upsert": true })),
+                        },
+                    ]),
                     constraints: vec![Constraint {
                         kind: String::from("routing"),
                         required_variant: None,

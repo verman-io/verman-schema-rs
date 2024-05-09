@@ -143,7 +143,9 @@
           "uri": "file://win_nginx.conf",
           "src_uri": null,
           "action": "nginx::make_site_available",
-          "action_args": "{ \"upsert\": true }"
+          "action_args": {
+            "upsert": true
+          }
         }
       ]
     }

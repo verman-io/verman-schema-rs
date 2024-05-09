@@ -86,7 +86,9 @@ action = "mount::expose"
 when = "OS == \"windows\""
 uri = "file://win_nginx.conf"
 action = "nginx::make_site_available"
-action_args = "{ \"upsert\": true }"
+
+[component.mounts.action_args]
+upsert = true
 
 [env_vars]
 DEBUG_ROOT = "true"
