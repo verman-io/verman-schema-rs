@@ -349,11 +349,27 @@ mod tests {
                     dst_uri: Some(String::from("my_app.verman.io").into()),
                     mounts: Some(vec![
                         Mount {
+                            when: String::from("OS == \"windows\""),
+                            uri: Some(String::from("file://win_nginx.conf").into()),
+                            src_uri: None,
+                            action: String::from("nginx::make_site_available"),
+                            action_args: Some(json!({ "upsert": true })),
+                        },
+                        Mount {
                             when: String::from(
                                 "NOT EXISTS(ISPREFIXOF(\"nginx::\", ${.mounts[].action}))",
                             ),
-                            uri: Some(String::from("/api/foo").into()),
-                            src_uri: Some(String::from("http://localhost:8080").into()),
+                            uri: Some(String::from("/api/py").into()),
+                            src_uri: Some(String::from("#!/jq\n.component[] | select(.constraints[] | .kind == \"lang\" and .required_variant == \"python\").dst_uri").into()),
+                            action: String::from("mount::expose"),
+                            action_args: None,
+                        },
+                        Mount {
+                            when: String::from(
+                                "NOT EXISTS(ISPREFIXOF(\"nginx::\", ${.mounts[].action}))",
+                            ),
+                            uri: Some(String::from("/api/ruby").into()),
+                            src_uri: Some(String::from("#!/jq\n'.component[] | select(.constraints[] | .kind == \"lang\" and .required_variant == \"ruby\").dst_uri").into()),
                             action: String::from("mount::expose"),
                             action_args: None,
                         },
@@ -363,14 +379,7 @@ mod tests {
                             src_uri: None, // 404
                             action: String::from("mount::expose"),
                             action_args: None,
-                        },
-                        Mount {
-                            when: String::from("OS == \"windows\""),
-                            uri: Some(String::from("file://win_nginx.conf").into()),
-                            src_uri: None,
-                            action: String::from("nginx::make_site_available"),
-                            action_args: Some(json!({ "upsert": true })),
-                        },
+                        }
                     ]),
                     constraints: vec![Constraint {
                         kind: String::from("routing"),

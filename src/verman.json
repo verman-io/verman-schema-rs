@@ -125,9 +125,25 @@
       },
       "mounts": [
         {
+          "when": "OS == \"windows\"",
+          "uri": "file://win_nginx.conf",
+          "src_uri": null,
+          "action": "nginx::make_site_available",
+          "action_args": {
+            "upsert": true
+          }
+        },
+        {
           "when": "NOT EXISTS(ISPREFIXOF(\"nginx::\", ${.mounts[].action}))",
-          "uri": "/api/foo",
-          "src_uri": "http://localhost:8080",
+          "uri": "/api/py",
+          "src_uri": "#!/jq\n.component[] | select(.constraints[] | .kind == \"lang\" and .required_variant == \"python\").dst_uri",
+          "action": "mount::expose",
+          "action_args": null
+        },
+        {
+          "when": "NOT EXISTS(ISPREFIXOF(\"nginx::\", ${.mounts[].action}))",
+          "uri": "/api/ruby",
+          "src_uri": "#!/jq\n'.component[] | select(.constraints[] | .kind == \"lang\" and .required_variant == \"ruby\").dst_uri",
           "action": "mount::expose",
           "action_args": null
         },
@@ -137,15 +153,6 @@
           "src_uri": null,
           "action": "mount::expose",
           "action_args": null
-        },
-        {
-          "when": "OS == \"windows\"",
-          "uri": "file://win_nginx.conf",
-          "src_uri": null,
-          "action": "nginx::make_site_available",
-          "action_args": {
-            "upsert": true
-          }
         }
       ]
     }

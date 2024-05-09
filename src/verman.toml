@@ -72,23 +72,33 @@ kind = "routing"
 COMPONENT_NAME = "mount_component"
 
 [[component.mounts]]
-when = "NOT EXISTS(ISPREFIXOF(\"nginx::\", ${.mounts[].action}))"
-uri = "/api/foo"
-src_uri = "http://localhost:8080"
-action = "mount::expose"
-
-[[component.mounts]]
-when = "BUILD_TIME > 2024"
-uri = "/api/demo"
-action = "mount::expose"
-
-[[component.mounts]]
 when = "OS == \"windows\""
 uri = "file://win_nginx.conf"
 action = "nginx::make_site_available"
 
 [component.mounts.action_args]
 upsert = true
+
+[[component.mounts]]
+when = "NOT EXISTS(ISPREFIXOF(\"nginx::\", ${.mounts[].action}))"
+uri = "/api/py"
+src_uri = """
+#!/jq
+.component[] | select(.constraints[] | .kind == \"lang\" and .required_variant == \"python\").dst_uri"""
+action = "mount::expose"
+
+[[component.mounts]]
+when = "NOT EXISTS(ISPREFIXOF(\"nginx::\", ${.mounts[].action}))"
+uri = "/api/ruby"
+src_uri = """
+#!/jq
+'.component[] | select(.constraints[] | .kind == \"lang\" and .required_variant == \"ruby\").dst_uri"""
+action = "mount::expose"
+
+[[component.mounts]]
+when = "BUILD_TIME > 2024"
+uri = "/api/demo"
+action = "mount::expose"
 
 [env_vars]
 DEBUG_ROOT = "true"
