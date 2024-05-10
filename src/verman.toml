@@ -47,11 +47,9 @@ kind = "OS"
 
 [[component]]
 src_uri = "file://ruby_api_folder/"
-
-[component.dst_uri]
-if = "OS == \"windows\""
-then = '"\\.\pipe\PipeName"'
-else = "\"unix:///var/run/my-socket.sock\""
+dst_uri = '''
+#!/jq
+if $OS == "windows" then "\\.\pipe\PipeName" else "unix:///var/run/my-socket.sock"'''
 
 [[component.constraints]]
 kind = "lang"
@@ -80,19 +78,23 @@ action = "nginx::make_site_available"
 upsert = true
 
 [[component.mounts]]
-when = "NOT EXISTS(ISPREFIXOF(\"nginx::\", ${.mounts[].action}))"
+when = """
+#!/jq
+any(.; .component[].mounts[]?.action | startswith(\"nginx::\"))"""
 uri = "/api/py"
 src_uri = """
 #!/jq
-.component[] | select(.constraints[] | .kind == \"lang\" and .required_variant == \"python\").dst_uri"""
+.component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"python\"])).dst_uri"""
 action = "mount::expose"
 
 [[component.mounts]]
-when = "NOT EXISTS(ISPREFIXOF(\"nginx::\", ${.mounts[].action}))"
+when = """
+#!/jq
+any(.; .component[].mounts[]?.action | startswith(\"nginx::\"))"""
 uri = "/api/ruby"
 src_uri = """
 #!/jq
-'.component[] | select(.constraints[] | .kind == \"lang\" and .required_variant == \"ruby\").dst_uri"""
+.component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"ruby\"])).dst_uri"""
 action = "mount::expose"
 
 [[component.mounts]]
