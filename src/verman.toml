@@ -36,7 +36,7 @@ certificate_vendor = "LetsEncrypt"
 
 [[component]]
 src_uri = "file://python_api_folder/"
-dst_uri = "http://localhost:${env.PYTHON_API_PORT}"
+dst_uri = "http://localhost:${PYTHON_API_PORT}"
 
 [[component.constraints]]
 kind = "lang"
@@ -58,7 +58,9 @@ required_version = ">3.1.2, <3.2"
 
 [[component.constraints]]
 kind = "OS"
-required_variant = "${\"linux\" || \"windows\"}"
+required_variant = """
+#!/jq
+$OS | in({\"linux\" || \"windows\"})"""
 
 [[component]]
 dst_uri = "my_app.verman.io"
@@ -70,7 +72,9 @@ kind = "routing"
 COMPONENT_NAME = "mount_component"
 
 [[component.mounts]]
-when = "OS == \"windows\""
+when = """
+#!/jq
+$OS == \"windows\""""
 uri = "file://win_nginx.conf"
 action = "nginx::make_site_available"
 

@@ -259,7 +259,7 @@ mod tests {
             component: vec![
                 Component {
                     src_uri: Some(String::from("file://python_api_folder/")),
-                    dst_uri: Some(String::from("http://localhost:${env.PYTHON_API_PORT}")),
+                    dst_uri: Some(String::from("http://localhost:${PYTHON_API_PORT}")),
                     constraints: vec![
                         Constraint {
                             kind: String::from("lang"),
@@ -286,7 +286,7 @@ mod tests {
                         },
                         Constraint {
                             kind: String::from("OS"),
-                            required_variant: Some(String::from("${\"linux\" || \"windows\"}")),
+                            required_variant: Some(String::from("#!/jq\n$OS | in({\"linux\" || \"windows\"})")),
                             required_version: None,
                         },
                     ],
@@ -298,7 +298,7 @@ mod tests {
                     dst_uri: Some(String::from("my_app.verman.io")),
                     mounts: Some(vec![
                         Mount {
-                            when: String::from("OS == \"windows\""),
+                            when: String::from("#!/jq\n$OS == \"windows\""),
                             uri: Some(String::from("file://win_nginx.conf")),
                             src_uri: None,
                             action: String::from("nginx::make_site_available"),

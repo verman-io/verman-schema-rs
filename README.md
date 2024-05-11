@@ -27,6 +27,7 @@ Configuration resolution should be straightforward. To remove ambiguity, this is
     a) implicitly takes config file-contents as `stdin`
     b) aforementioned `vars` are made available to shebang-evaluated
     c) `#!/jq` isn't real [`jq`](https://jqlang.github.io/jq) but the `#RewriteInRust` [`jaq`](https://github.com/01mf02/jaq) compiled into this library
+    d) Similarly, the normal shebang isn't real. This library handles execution; by reading the first line; making this far more portable (e.g., to Windows [both CMD and PowerShell]).
   5. Similar to `$ref` of [JSON-reference](https://niem.github.io/json/reference/json-schema/references) (common in [JSON-schema](https://json-schema.org/specification)) cross-referencing can occur and thus multiple passes may be required to fully-resolve variables
 
 <hr/>
