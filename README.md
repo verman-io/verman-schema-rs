@@ -30,6 +30,21 @@ Configuration resolution should be straightforward. To remove ambiguity, this is
     d) Similarly, the normal shebang isn't real. This library handles execution; by reading the first line; making this far more portable (e.g., to Windows [both CMD and PowerShell]).
   5. Similar to `$ref` of [JSON-reference](https://niem.github.io/json/reference/json-schema/references) (common in [JSON-schema](https://json-schema.org/specification)) cross-referencing can occur and thus multiple passes may be required to fully-resolve variables
 
+## Building
+
+### Release (shared library)
+
+```sh
+$ cargo rustc --crate-type cdylib --release
+```
+
+On my x86_64 Linux box this produces:
+```
+3.7M ./target/release/deps/libserde_derive-b66a5407fc23d48c.so
+16K  ./target/release/deps/libverman_schema_rs.so
+16K  ./target/release/libverman_schema_rs.so
+``````
+
 <hr/>
 
 ## License

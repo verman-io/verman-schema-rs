@@ -160,6 +160,23 @@ pub struct VendorVersion {
     s
 } */
 
+pub fn maybe_modify_string<'t>(s: &'t str) -> std::borrow::Cow<'t, str> {
+    if let Some((first_line, rest)) = s.split_once("\n") {
+        if first_line.starts_with("#!") {
+            if first_line.starts_with("#!/jq\n") {
+                // unimplemented!("TODO: jaq with {}", rest)
+                std::borrow::Cow::Owned(String::from(rest))
+            } else {
+                unimplemented!("TODO: Generic shebang handling")
+            }
+        } else {
+            std::borrow::Cow::Borrowed(s)
+        }
+    } else {
+        std::borrow::Cow::Borrowed(s)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -360,5 +377,12 @@ mod tests {
             toml::to_string(&config).unwrap(),
             toml::to_string(&root_from_toml).unwrap()
         );
+    }
+
+    #[test]
+    fn it_maybe_modify_string() {
+        let s0 = String::from("foo");
+        let s0_after = maybe_modify_string(&s0);
+        assert_eq!(s0, s0_after);
     }
 }
