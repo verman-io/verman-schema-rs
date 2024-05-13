@@ -12,3 +12,7 @@ indexmap = { version = "2.2.6", features = ["serde"] }
 toml = { version = "0.8.12", features = ["preserve_order"] }
 void = "1.0.2"
 lazy_static = "1.4.0"
+jaq-core = "1.2.1"
+jaq-parse = "1.0.2"
+jaq-std = "1.2.1"
+jaq-interpret = "1.2.1"

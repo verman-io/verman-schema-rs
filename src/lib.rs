@@ -1,7 +1,11 @@
+#![feature(iter_collect_into)]
+extern crate jaq_core;
+extern crate jaq_interpret;
 extern crate serde;
 #[macro_use]
 extern crate lazy_static;
 
+use jaq_interpret::{Error, Val};
 use serde_derive::{Deserialize, Serialize};
 
 pub const ARCH: &'static str = std::env::consts::ARCH;
@@ -160,12 +164,30 @@ pub struct VendorVersion {
     s
 } */
 
-pub fn maybe_modify_string<'t>(s: &'t str) -> std::borrow::Cow<'t, str> {
+fn jq<'a>(value: serde_json::Value, filter: &str) -> Result<String, Error> {
+    // start out only from core filters,
+    // which do not include filters in the standard library
+    // such as `map`, `select` etc.
+    let mut defs = jaq_interpret::ParseCtx::new(Vec::new());
+
+    // parse the filter
+    let (f, errs) = jaq_parse::parse(filter, jaq_parse::main());
+    assert_eq!(errs, Vec::new());
+
+    // compile the filter in the context of the given definitions
+    let f = defs.compile(f.unwrap());
+    assert!(defs.errs.is_empty());
+
+    let inputs = jaq_interpret::RcIter::new(core::iter::empty());
+
+    jaq_interpret::FilterT::run(&f, (jaq_interpret::Ctx::new([], &inputs), <jaq_interpret::Val as From<serde_json::Value>>::from(value))).into_iter().to
+}
+
+pub fn maybe_modify_string<'a, 'b>(vars: &'a indexmap::IndexMap<String, String>, s: &str) -> std::borrow::Cow<'b, str> {
     if let Some((first_line, rest)) = s.split_once("\n") {
         if first_line.starts_with("#!") {
             if first_line.starts_with("#!/jq\n") {
-                // unimplemented!("TODO: jaq with {}", rest)
-                std::borrow::Cow::Owned(String::from(rest))
+                std::borrow::Cow::Owned(jq(serde_json::json!(vars["config"]), rest))
             } else {
                 unimplemented!("TODO: Generic shebang handling")
             }
@@ -180,7 +202,6 @@ pub fn maybe_modify_string<'t>(s: &'t str) -> std::borrow::Cow<'t, str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
 
     const VERMAN_JSON: &'static str = include_str!("verman.json");
     const VERMAN_TOML: &'static str = include_str!("verman.toml");
@@ -319,7 +340,7 @@ mod tests {
                             uri: Some(String::from("file://win_nginx.conf")),
                             src_uri: None,
                             action: String::from("nginx::make_site_available"),
-                            action_args: Some(json!({ "upsert": true })),
+                            action_args: Some(serde_json::json!({ "upsert": true })),
                         },
                         Mount {
                             when: String::from("#!/jq\nany(.; .component[].mounts[]?.action | startswith(\"nginx::\"))"),
@@ -381,8 +402,10 @@ mod tests {
 
     #[test]
     fn it_maybe_modify_string() {
-        let s0 = String::from("foo");
-        let s0_after = maybe_modify_string(&s0);
-        assert_eq!(s0, s0_after);
+        let vars: indexmap::IndexMap<String, String> = indexmap::indexmap!{
+            String::from("config") => String::from("[\"Hello\", \"World\"]")
+        };
+        let s0_after = maybe_modify_string(&vars, ".[]");
+        assert_eq!(s0_after, String::from("Hello"));
     }
 }
