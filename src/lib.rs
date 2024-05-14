@@ -179,44 +179,45 @@ fn jq<'a>(value: serde_json::Value, filter: &str) -> Result<String, jaq_interpre
 
     let inputs = jaq_interpret::RcIter::new(core::iter::empty());
 
-    use hifijson::token::Lex;
-    let json =
-        |s: String| hifijson::SliceLexer::new(s.as_bytes()).exactly_one(jaq_interpret::Val::parse);
-
-    let mut out = jaq_interpret::FilterT::run(
+    let out = jaq_interpret::FilterT::run(
         &f,
         (
             jaq_interpret::Ctx::new([], &inputs),
             <jaq_interpret::Val as From<serde_json::Value>>::from(value),
         ),
     );
-    let mut results: Vec<String> = Vec::new();
-    while let Some(result) = out.next() {
-        match result {
-            Some(Ok(val)) => results.push(format!("{}", val)),
-            _ => break,
-        }
+    let mut results = Vec::<String>::new();
+    out.filter_map(|val| Option::from(val.ok()?.to_string_or_clone()))
+        .collect_into(&mut results);
+    if results.is_empty() {
+        Err(jaq_interpret::Error::IndexOutOfBounds(0))
+    } else {
+        Ok(results.join("\n"))
     }
-
-    Ok(results.join("\n"))
 }
 
 pub fn maybe_modify_string<'a, 'b>(
     vars: &'a indexmap::IndexMap<String, String>,
-    s: &str,
-) -> std::borrow::Cow<'b, str> {
+    s: &'b str,
+) -> Result<std::borrow::Cow<'b, str>, jaq_interpret::Error> {
     if let Some((first_line, rest)) = s.split_once("\n") {
-        if first_line.starts_with("#!") {
-            if first_line.starts_with("#!/jq\n") {
-                std::borrow::Cow::Owned(jq(serde_json::json!(vars["config"]), rest))
+        if first_line.starts_with("#!/") {
+            if first_line.starts_with("#!/jq") {
+                Ok(std::borrow::Cow::Owned(jq(
+                    serde_json::json!(vars["config"]),
+                    rest,
+                )?))
             } else {
-                unimplemented!("TODO: Generic shebang handling")
+                unimplemented!(
+                    "TODO: Generic shebang handling, first line was: {}",
+                    first_line
+                )
             }
         } else {
-            std::borrow::Cow::Borrowed(s)
+            Ok(std::borrow::Cow::Borrowed(s))
         }
     } else {
-        std::borrow::Cow::Borrowed(s)
+        Ok(std::borrow::Cow::Borrowed(s))
     }
 }
 
@@ -426,7 +427,10 @@ mod tests {
         let vars: indexmap::IndexMap<String, String> = indexmap::indexmap! {
             String::from("config") => String::from("[\"Hello\", \"World\"]")
         };
-        let s0_after = maybe_modify_string(&vars, ".[]");
-        assert_eq!(s0_after, String::from("Hello"));
+        let untouched: &'static str = "untouched";
+        let no_shebang = maybe_modify_string(&vars, untouched).unwrap();
+        let jq_runs = maybe_modify_string(&vars, "#!/jq\n.[]").unwrap();
+        assert_eq!(no_shebang, untouched);
+        assert_eq!(jq_runs, String::from("\"Hello\"\n\"World\""));
     }
 }
