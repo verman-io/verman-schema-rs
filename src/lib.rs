@@ -5,7 +5,6 @@ extern crate serde;
 #[macro_use]
 extern crate lazy_static;
 
-use jaq_interpret::{Error, Val};
 use serde_derive::{Deserialize, Serialize};
 
 pub const ARCH: &'static str = std::env::consts::ARCH;
@@ -164,7 +163,7 @@ pub struct VendorVersion {
     s
 } */
 
-fn jq<'a>(value: serde_json::Value, filter: &str) -> Result<String, Error> {
+fn jq<'a>(value: serde_json::Value, filter: &str) -> Result<String, jaq_interpret::Error> {
     // start out only from core filters,
     // which do not include filters in the standard library
     // such as `map`, `select` etc.
@@ -180,10 +179,32 @@ fn jq<'a>(value: serde_json::Value, filter: &str) -> Result<String, Error> {
 
     let inputs = jaq_interpret::RcIter::new(core::iter::empty());
 
-    jaq_interpret::FilterT::run(&f, (jaq_interpret::Ctx::new([], &inputs), <jaq_interpret::Val as From<serde_json::Value>>::from(value))).into_iter().to
+    use hifijson::token::Lex;
+    let json =
+        |s: String| hifijson::SliceLexer::new(s.as_bytes()).exactly_one(jaq_interpret::Val::parse);
+
+    let mut out = jaq_interpret::FilterT::run(
+        &f,
+        (
+            jaq_interpret::Ctx::new([], &inputs),
+            <jaq_interpret::Val as From<serde_json::Value>>::from(value),
+        ),
+    );
+    let mut results: Vec<String> = Vec::new();
+    while let Some(result) = out.next() {
+        match result {
+            Some(Ok(val)) => results.push(format!("{}", val)),
+            _ => break,
+        }
+    }
+
+    Ok(results.join("\n"))
 }
 
-pub fn maybe_modify_string<'a, 'b>(vars: &'a indexmap::IndexMap<String, String>, s: &str) -> std::borrow::Cow<'b, str> {
+pub fn maybe_modify_string<'a, 'b>(
+    vars: &'a indexmap::IndexMap<String, String>,
+    s: &str,
+) -> std::borrow::Cow<'b, str> {
     if let Some((first_line, rest)) = s.split_once("\n") {
         if first_line.starts_with("#!") {
             if first_line.starts_with("#!/jq\n") {
@@ -402,7 +423,7 @@ mod tests {
 
     #[test]
     fn it_maybe_modify_string() {
-        let vars: indexmap::IndexMap<String, String> = indexmap::indexmap!{
+        let vars: indexmap::IndexMap<String, String> = indexmap::indexmap! {
             String::from("config") => String::from("[\"Hello\", \"World\"]")
         };
         let s0_after = maybe_modify_string(&vars, ".[]");
