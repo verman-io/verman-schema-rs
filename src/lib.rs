@@ -5,6 +5,8 @@ extern crate serde;
 #[macro_use]
 extern crate lazy_static;
 
+use jaq_interpret::error::Type;
+use jaq_interpret::Val;
 use serde_derive::{Deserialize, Serialize};
 
 pub const ARCH: &'static str = std::env::consts::ARCH;
@@ -163,7 +165,21 @@ pub struct VendorVersion {
     s
 } */
 
-fn jq<'a>(value: serde_json::Value, filter: &str) -> Result<String, jaq_interpret::Error> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Error {
+    Jaq(jaq_interpret::Error),
+    /// Depressing
+    UnexpectedEmptiness
+}
+
+impl From<jaq_interpret::Error> for Error {
+    fn from(err: jaq_interpret::Error) -> Self {
+        Error::Jaq(err)
+    }
+}
+
+fn jq<'a>(value: serde_json::Value, filter: &str) -> Result<String, Error> {
     // start out only from core filters,
     // which do not include filters in the standard library
     // such as `map`, `select` etc.
@@ -190,7 +206,7 @@ fn jq<'a>(value: serde_json::Value, filter: &str) -> Result<String, jaq_interpre
     out.filter_map(|val| Option::from(val.ok()?.to_string_or_clone()))
         .collect_into(&mut results);
     if results.is_empty() {
-        Err(jaq_interpret::Error::IndexOutOfBounds(0))
+        Err(Error::UnexpectedEmptiness)
     } else {
         Ok(results.join("\n"))
     }
