@@ -5,8 +5,6 @@ extern crate serde;
 #[macro_use]
 extern crate lazy_static;
 
-use jaq_interpret::error::Type;
-use jaq_interpret::Val;
 use serde_derive::{Deserialize, Serialize};
 
 pub const ARCH: &'static str = std::env::consts::ARCH;
@@ -27,6 +25,8 @@ pub struct Root {
     pub repo: Option<String>,
     pub authors: Vec<String>,
 
+    pub verman: VermanConfig,
+
     pub stack: indexmap::IndexMap<String, Vec<ServerConfiguration>>,
     pub stack_state: indexmap::IndexMap<String, StateValues>,
     pub stack_routing: Vec<ProtocolConfiguration>,
@@ -34,6 +34,23 @@ pub struct Root {
     pub component: Vec<Component>,
     /// environment variables. Priority: `ServerConfiguration` | `Component`; `Root`; system.
     pub env_vars: Option<indexmap::IndexMap<String, String>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct VermanConfig {
+    /// If shebang is provided, takes priority
+    /// Special lines:
+    /// - `"#!/jq"` uses internal `jaq` dependency (no external `jq`)
+    /// - `"#!/echo` simply outputs the lines below it
+    shell: String,
+}
+
+impl Default for VermanConfig {
+    fn default() -> Self {
+        Self {
+            shell: String::from("#!/jq"),
+        }
+    }
 }
 
 const fn default_name() -> std::borrow::Cow<'static, str> {
@@ -104,7 +121,6 @@ pub struct ProtocolConfiguration {
 
 /// URI generalised to UTF8 https://en.wikipedia.org/wiki/Internationalized_Resource_Identifier
 // type Iri = String;
-
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Component {
@@ -170,7 +186,7 @@ pub struct VendorVersion {
 pub enum Error {
     Jaq(jaq_interpret::Error),
     /// Depressing
-    UnexpectedEmptiness
+    UnexpectedEmptiness,
 }
 
 impl From<jaq_interpret::Error> for Error {
@@ -212,22 +228,23 @@ fn jq<'a>(value: serde_json::Value, filter: &str) -> Result<String, Error> {
     }
 }
 
-pub fn maybe_modify_string<'a, 'b>(
+pub fn maybe_modify_string_via_shebang<'a, 'b>(
     vars: &'a indexmap::IndexMap<String, String>,
     s: &'b str,
-) -> Result<std::borrow::Cow<'b, str>, jaq_interpret::Error> {
+) -> Result<std::borrow::Cow<'b, str>, Error> {
     if let Some((first_line, rest)) = s.split_once("\n") {
         if first_line.starts_with("#!/") {
-            if first_line.starts_with("#!/jq") {
-                Ok(std::borrow::Cow::Owned(jq(
-                    serde_json::json!(vars["config"]),
-                    rest,
-                )?))
-            } else {
-                unimplemented!(
-                    "TODO: Generic shebang handling, first line was: {}",
-                    first_line
-                )
+            match first_line {
+                "#!/jq" =>
+                // `^ the `?` operator cannot be applied to type `Cow<'_, _>``
+                {
+                    match jq(serde_json::json!(vars["config"]), rest) {
+                        Ok(jq_ified) => Ok(std::borrow::Cow::Owned(jq_ified)),
+                        Err(e) => Err(e),
+                    }
+                }
+                "#!/echo" => Ok(std::borrow::Cow::Borrowed(rest)),
+                _ => unimplemented!("TODO: Generic shebang handling for: {}", first_line),
             }
         } else {
             Ok(std::borrow::Cow::Borrowed(s))
@@ -253,6 +270,8 @@ mod tests {
             homepage: Some(String::from("https://verman.io")),
             repo: Some(String::from("https://github.com/verman-io")),
             authors: vec![String::from(env!("CARGO_PKG_AUTHORS"))],
+
+            verman: VermanConfig::default(),
 
             stack_state: {
                 let mut state = indexmap::IndexMap::<String, StateValues>::new();
@@ -400,7 +419,7 @@ mod tests {
                             src_uri: None, // 404
                             action: String::from("mount::expose"),
                             action_args: None,
-                        }
+                        },
                     ]),
                     constraints: vec![Constraint {
                         kind: String::from("routing"),
@@ -439,13 +458,13 @@ mod tests {
     }
 
     #[test]
-    fn it_maybe_modify_string() {
+    fn it_maybe_modify_string_via_shebang() {
         let vars: indexmap::IndexMap<String, String> = indexmap::indexmap! {
             String::from("config") => String::from("[\"Hello\", \"World\"]")
         };
         let untouched: &'static str = "untouched";
-        let no_shebang = maybe_modify_string(&vars, untouched).unwrap();
-        let jq_runs = maybe_modify_string(&vars, "#!/jq\n.[]").unwrap();
+        let no_shebang = maybe_modify_string_via_shebang(&vars, untouched).unwrap();
+        let jq_runs = maybe_modify_string_via_shebang(&vars, "#!/jq\n.[]").unwrap();
         assert_eq!(no_shebang, untouched);
         assert_eq!(jq_runs, String::from("\"Hello\"\n\"World\""));
     }

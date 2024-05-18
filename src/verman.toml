@@ -5,6 +5,9 @@ homepage = "https://verman.io"
 repo = "https://github.com/verman-io"
 authors = [""]
 
+[verman]
+shell = "#!/jq"
+
 [[stack.database]]
 kind = "sql"
 
