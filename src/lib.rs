@@ -372,7 +372,7 @@ mod tests {
                 },
                 Component {
                     src_uri: Some(String::from("file://ruby_api_folder/")),
-                    dst_uri: Some(String::from("#!/jq\nif $OS == \"windows\" then \"\\\\.\\pipe\\PipeName\" else \"unix:///var/run/my-socket.sock\"")),
+                    dst_uri: Some(String::from("if $OS == \"windows\" then \"\\\\.\\pipe\\PipeName\" else \"unix:///var/run/my-socket.sock\"")),
                     constraints: vec![
                         Constraint {
                             kind: String::from("lang"),
@@ -381,7 +381,7 @@ mod tests {
                         },
                         Constraint {
                             kind: String::from("OS"),
-                            required_variant: Some(String::from("#!/jq\n$OS | in({\"linux\" || \"windows\"})")),
+                            required_variant: Some(String::from("$OS | in({\"linux\" || \"windows\"})")),
                             required_version: None,
                         },
                     ],
@@ -393,28 +393,28 @@ mod tests {
                     dst_uri: Some(String::from("my_app.verman.io")),
                     mounts: Some(vec![
                         Mount {
-                            when: String::from("#!/jq\n$OS == \"windows\""),
+                            when: String::from("$OS == \"windows\""),
                             uri: Some(String::from("file://win_nginx.conf")),
                             src_uri: None,
                             action: String::from("nginx::make_site_available"),
                             action_args: Some(serde_json::json!({ "upsert": true })),
                         },
                         Mount {
-                            when: String::from("#!/jq\nany(.; .component[].mounts[]?.action | startswith(\"nginx::\"))"),
+                            when: String::from("any(.; .component[].mounts[]?.action | startswith(\"nginx::\"))"),
                             uri: Some(String::from("/api/py")),
-                            src_uri: Some(String::from("#!/jq\n.component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"python\"])).dst_uri")),
+                            src_uri: Some(String::from(".component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"python\"])).dst_uri")),
                             action: String::from("mount::expose"),
                             action_args: None,
                         },
                         Mount {
-                            when: String::from("#!/jq\nany(.; .component[].mounts[]?.action | startswith(\"nginx::\"))"),
+                            when: String::from("any(.; .component[].mounts[]?.action | startswith(\"nginx::\"))"),
                             uri: Some(String::from("/api/ruby")),
-                            src_uri: Some(String::from("#!/jq\n.component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"ruby\"])).dst_uri")),
+                            src_uri: Some(String::from(".component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"ruby\"])).dst_uri")),
                             action: String::from("mount::expose"),
                             action_args: None,
                         },
                         Mount {
-                            when: String::from("BUILD_TIME > 2024"),
+                            when: String::from("$BUILD_TIME > 2024"),
                             uri: Some(String::from("/api/demo")),
                             src_uri: None, // 404
                             action: String::from("mount::expose"),
@@ -462,10 +462,10 @@ mod tests {
         let vars: indexmap::IndexMap<String, String> = indexmap::indexmap! {
             String::from("config") => String::from("[\"Hello\", \"World\"]")
         };
-        let untouched: &'static str = "untouched";
-        let no_shebang = maybe_modify_string_via_shebang(&vars, untouched).unwrap();
-        let jq_runs = maybe_modify_string_via_shebang(&vars, "#!/jq\n.[]").unwrap();
-        assert_eq!(no_shebang, untouched);
+        const UNTOUCHED: &'static str = "UNTOUCHED";
+        let no_shebang = maybe_modify_string_via_shebang(&vars, UNTOUCHED).unwrap();
+        let jq_runs = maybe_modify_string_via_shebang(&vars, ".[]").unwrap();
+        assert_eq!(no_shebang, UNTOUCHED);
         assert_eq!(jq_runs, String::from("\"Hello\"\n\"World\""));
     }
 }

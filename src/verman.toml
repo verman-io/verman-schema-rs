@@ -50,9 +50,7 @@ kind = "OS"
 
 [[component]]
 src_uri = "file://ruby_api_folder/"
-dst_uri = '''
-#!/jq
-if $OS == "windows" then "\\.\pipe\PipeName" else "unix:///var/run/my-socket.sock"'''
+dst_uri = 'if $OS == "windows" then "\\.\pipe\PipeName" else "unix:///var/run/my-socket.sock"'
 
 [[component.constraints]]
 kind = "lang"
@@ -61,9 +59,7 @@ required_version = ">3.1.2, <3.2"
 
 [[component.constraints]]
 kind = "OS"
-required_variant = """
-#!/jq
-$OS | in({\"linux\" || \"windows\"})"""
+required_variant = "$OS | in({\"linux\" || \"windows\"})"
 
 [[component]]
 dst_uri = "my_app.verman.io"
@@ -75,9 +71,7 @@ kind = "routing"
 COMPONENT_NAME = "mount_component"
 
 [[component.mounts]]
-when = """
-#!/jq
-$OS == \"windows\""""
+when = "$OS == \"windows\""
 uri = "file://win_nginx.conf"
 action = "nginx::make_site_available"
 
@@ -85,27 +79,19 @@ action = "nginx::make_site_available"
 upsert = true
 
 [[component.mounts]]
-when = """
-#!/jq
-any(.; .component[].mounts[]?.action | startswith(\"nginx::\"))"""
+when = "any(.; .component[].mounts[]?.action | startswith(\"nginx::\"))"
 uri = "/api/py"
-src_uri = """
-#!/jq
-.component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"python\"])).dst_uri"""
+src_uri = ".component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"python\"])).dst_uri"
 action = "mount::expose"
 
 [[component.mounts]]
-when = """
-#!/jq
-any(.; .component[].mounts[]?.action | startswith(\"nginx::\"))"""
+when = "any(.; .component[].mounts[]?.action | startswith(\"nginx::\"))"
 uri = "/api/ruby"
-src_uri = """
-#!/jq
-.component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"ruby\"])).dst_uri"""
+src_uri = ".component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"ruby\"])).dst_uri"
 action = "mount::expose"
 
 [[component.mounts]]
-when = "BUILD_TIME > 2024"
+when = "$BUILD_TIME > 2024"
 uri = "/api/demo"
 action = "mount::expose"
 

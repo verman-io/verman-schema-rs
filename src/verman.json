@@ -93,7 +93,7 @@
     },
     {
       "src_uri": "file://ruby_api_folder/",
-      "dst_uri": "#!/jq\nif $OS == \"windows\" then \"\\\\.\\pipe\\PipeName\" else \"unix:///var/run/my-socket.sock\"",
+      "dst_uri": "if $OS == \"windows\" then \"\\\\.\\pipe\\PipeName\" else \"unix:///var/run/my-socket.sock\"",
       "constraints": [
         {
           "kind": "lang",
@@ -102,7 +102,7 @@
         },
         {
           "kind": "OS",
-          "required_variant": "#!/jq\n$OS | in({\"linux\" || \"windows\"})",
+          "required_variant": "$OS | in({\"linux\" || \"windows\"})",
           "required_version": null
         }
       ],
@@ -124,7 +124,7 @@
       },
       "mounts": [
         {
-          "when": "#!/jq\n$OS == \"windows\"",
+          "when": "$OS == \"windows\"",
           "uri": "file://win_nginx.conf",
           "src_uri": null,
           "action": "nginx::make_site_available",
@@ -133,21 +133,21 @@
           }
         },
         {
-          "when": "#!/jq\nany(.; .component[].mounts[]?.action | startswith(\"nginx::\"))",
+          "when": "any(.; .component[].mounts[]?.action | startswith(\"nginx::\"))",
           "uri": "/api/py",
-          "src_uri": "#!/jq\n.component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"python\"])).dst_uri",
+          "src_uri": ".component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"python\"])).dst_uri",
           "action": "mount::expose",
           "action_args": null
         },
         {
-          "when": "#!/jq\nany(.; .component[].mounts[]?.action | startswith(\"nginx::\"))",
+          "when": "any(.; .component[].mounts[]?.action | startswith(\"nginx::\"))",
           "uri": "/api/ruby",
-          "src_uri": "#!/jq\n.component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"ruby\"])).dst_uri",
+          "src_uri": ".component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"ruby\"])).dst_uri",
           "action": "mount::expose",
           "action_args": null
         },
         {
-          "when": "BUILD_TIME > 2024",
+          "when": "$BUILD_TIME > 2024",
           "uri": "/api/demo",
           "src_uri": null,
           "action": "mount::expose",
