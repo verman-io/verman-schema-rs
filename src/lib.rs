@@ -177,16 +177,21 @@ pub struct VendorVersion {
     pub version: Option<String>,
 }
 
-/* pub fn eval_field(s: Box<dyn Into<String>>) -> String {
+/*
+pub fn eval_field(s: Box<dyn Into<String>>) -> String {
     s
-} */
+}
+*/
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum Error {
     Jaq(jaq_interpret::Error),
+    IOError(std::io::Error),
     /// Depressing
     UnexpectedEmptiness,
+    ParsingError,
+    CompilationError,
 }
 
 impl From<jaq_interpret::Error> for Error {
@@ -196,36 +201,46 @@ impl From<jaq_interpret::Error> for Error {
 }
 
 fn jq<'a>(value: serde_json::Value, filter: &str) -> Result<String, Error> {
-    // start out only from core filters,
-    // which do not include filters in the standard library
-    // such as `map`, `select` etc.
     let mut defs = jaq_interpret::ParseCtx::new(Vec::new());
 
-    // parse the filter
     let (f, errs) = jaq_parse::parse(filter, jaq_parse::main());
-    assert_eq!(errs, Vec::new());
+    if !errs.is_empty() {
+        return Err(Error::ParsingError);
+    }
 
-    // compile the filter in the context of the given definitions
     let f = defs.compile(f.unwrap());
-    assert!(defs.errs.is_empty());
+    if !defs.errs.is_empty() {
+        return Err(Error::CompilationError);
+    }
 
     let inputs = jaq_interpret::RcIter::new(core::iter::empty());
 
-    let out = jaq_interpret::FilterT::run(
+    let mut out = jaq_interpret::FilterT::run(
         &f,
         (
             jaq_interpret::Ctx::new([], &inputs),
             <jaq_interpret::Val as From<serde_json::Value>>::from(value),
         ),
     );
-    let mut results = Vec::<String>::new();
-    out.filter_map(|val| Option::from(val.ok()?.to_string_or_clone()))
-        .collect_into(&mut results);
-    if results.is_empty() {
-        Err(Error::UnexpectedEmptiness)
-    } else {
-        Ok(results.join("\n"))
+
+    let mut results = Vec::new();
+    while let Some(val) = out.next() {
+        match val {
+            Ok(jaq_interpret::Val::Str(s)) => {
+                println!("one row: {}\n", &s);
+                results.push(s.to_string())
+            },
+            _ => {
+                return Err(Error::IOError(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Unexpected value",
+                )))
+            }
+        }
     }
+    println!("results: {:?}", results);
+
+    Ok(String::from_iter(results.into_iter()))
 }
 
 pub fn maybe_modify_string_via_shebang<'a, 'b>(
