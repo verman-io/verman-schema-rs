@@ -40,8 +40,13 @@ pub struct Root {
 pub struct VermanConfig {
     /// If shebang is provided, takes priority
     /// Special lines:
-    /// - `"#!/jq"` uses internal `jaq` dependency (no external `jq`)
-    /// - `"#!/echo` simply outputs the lines below it
+    /// - `"#!/jq"` uses internal `jaq` dependency if feature `jaq` else errs
+    /// - `"#!/js"` uses internal JavaScript dependency based on deno if feature `js` enabled else errs
+    /// - `"#!/deno"` uses internal JavaScript dependency based on deno if feature `js` enabled else errs
+    /// - `"#!/wasm"` uses internal JavaScript dependency based on deno if feature `js` enabled else errs
+    /// - `"#!/lua"` uses internal Lua dependency if feature `lua` enabled else errs
+    /// - `"#!/python"` uses internal Python dependency if feature `python` enabled else errs
+    /// - `"#!/echo` simply outputs the lines after shebang
     shell: String,
 }
 
@@ -229,7 +234,7 @@ fn jq<'a>(value: serde_json::Value, filter: &str) -> Result<String, Error> {
             Ok(jaq_interpret::Val::Str(s)) => {
                 println!("one row: {}\n", &s);
                 results.push(s.to_string())
-            },
+            }
             _ => {
                 return Err(Error::IOError(std::io::Error::new(
                     std::io::ErrorKind::Other,
