@@ -1,11 +1,15 @@
 #![feature(iter_collect_into)]
+
+mod utils;
+
 extern crate jaq_core;
 extern crate jaq_interpret;
 extern crate serde;
 #[macro_use]
 extern crate lazy_static;
 
-use serde_derive::{Deserialize, Serialize};
+/// These 4 constants + `THIS` referring holding contents of current config file
+/// are made accessible to each script
 
 pub const ARCH: &'static str = std::env::consts::ARCH;
 pub const FAMILY: &'static str = std::env::consts::FAMILY;
@@ -13,9 +17,33 @@ pub const OS: &'static str = std::env::consts::OS;
 
 lazy_static! {
     pub static ref BUILD_TIME: std::time::SystemTime = std::time::SystemTime::now();
+    // RFC3339 format
+    pub static ref BUILD_TIME_STR: String = {
+        let since_epoch: std::time::Duration = BUILD_TIME.duration_since(std::time::UNIX_EPOCH).expect("Time went backwards");
+        let seconds: u64 = since_epoch.as_secs();
+        let nanos: u32 = since_epoch.subsec_nanos();
+        format!(
+            "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}Z",
+            1970 + seconds / 31536000,
+            (seconds % 31536000) / 2592000,
+            (seconds % 2592000) / 86400,
+            (seconds % 86400) / 3600,
+            (seconds % 3600) / 60,
+            seconds % 60,
+            nanos
+        )
+    };
+
+    pub static ref VARS: indexmap::IndexMap<String, String> = indexmap::indexmap! {
+            String::from("ARCH") => String::from(ARCH),
+            String::from("FAMILY") => String::from(FAMILY),
+            String::from("OS") => String::from(OS),
+            String::from("BUILD_TIME") => String::from(BUILD_TIME_STR.as_str()),
+            String::from("THIS") => String::from("#!/jq\n[\"Hello\", \"World\"]")
+    };
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
 pub struct Root {
     #[serde(default = "default_name")]
     pub name: std::borrow::Cow<'static, str>,
@@ -36,17 +64,17 @@ pub struct Root {
     pub env_vars: Option<indexmap::IndexMap<String, String>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
 pub struct VermanConfig {
-    /// If shebang is provided, takes priority
+    /// If shebang is provided, takes priority; otherwise this default is used
     /// Special lines:
-    /// - `"#!/jq"` uses internal `jaq` dependency if feature `jaq` else errs
-    /// - `"#!/js"` uses internal JavaScript dependency based on deno if feature `js` enabled else errs
-    /// - `"#!/deno"` uses internal JavaScript dependency based on deno if feature `js` enabled else errs
-    /// - `"#!/wasm"` uses internal JavaScript dependency based on deno if feature `js` enabled else errs
+    /// - `"#!/echo` simply outputs the lines after shebang
+    /// - `"#!/jq"` uses internal `jq` implementation (`jaq`) if feature `jaq` else errs
+    /// - `"#!/deno"` uses internal deno dependency (WASM, js, ts) if feature `js` enabled else errs
+    /// - `"#!/wasm"` uses internal deno dependency (WASM, js, ts) if feature `js` enabled else errs
+    /// - `"#!/js"` uses internal deno dependency (WASM, js, ts) if feature `js` enabled else errs
     /// - `"#!/lua"` uses internal Lua dependency if feature `lua` enabled else errs
     /// - `"#!/python"` uses internal Python dependency if feature `python` enabled else errs
-    /// - `"#!/echo` simply outputs the lines after shebang
     shell: String,
 }
 
@@ -63,7 +91,7 @@ const fn default_name() -> std::borrow::Cow<'static, str> {
     std::borrow::Cow::Borrowed(NAME)
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
 pub struct StateValues {
     pub kind: Option<String>,
     pub install: Option<State>,
@@ -72,7 +100,7 @@ pub struct StateValues {
     pub stop: Option<State>,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum State {
     /// [app/component] install or reinstall
@@ -103,7 +131,7 @@ pub enum State {
     DryRun,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
 pub struct ServerConfiguration {
     pub kind: String,
     pub versions: Option<Vec<String>>,
@@ -112,7 +140,7 @@ pub struct ServerConfiguration {
     pub env_vars: Option<indexmap::IndexMap<String, String>>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
 pub struct ProtocolConfiguration {
     /// E.g., "localhost" | "127.0.0.1" | "::1" | "my_name.verman.io"
     pub name: Option<String>,
@@ -126,7 +154,7 @@ pub struct ProtocolConfiguration {
 
 /// URI generalised to UTF8 https://en.wikipedia.org/wiki/Internationalized_Resource_Identifier
 // type Iri = String;
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Component {
     pub src_uri: Option<String>,
@@ -137,7 +165,7 @@ pub struct Component {
     pub mounts: Option<Vec<Mount>>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Mount {
     pub when: String,
@@ -149,7 +177,7 @@ pub struct Mount {
     pub action_args: Option<serde_json::Value>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Constraint {
     pub kind: String,
@@ -158,7 +186,9 @@ pub struct Constraint {
 }
 
 /// OSs from https://github.com/rust-lang/rust/blob/1.77.0/library/std/src/env.rs#L947-L961
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Default, Clone, PartialEq, Eq, Hash, serde_derive::Serialize, serde_derive::Deserialize,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Os {
     Linux,
@@ -176,7 +206,7 @@ pub enum Os {
     Unspecified,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
 pub struct VendorVersion {
     pub vendor: Option<String>,
     pub version: Option<String>,
@@ -205,7 +235,7 @@ impl From<jaq_interpret::Error> for Error {
     }
 }
 
-fn jq<'a>(value: serde_json::Value, filter: &str) -> Result<String, Error> {
+fn jq<'a>(vars: &'a mut indexmap::IndexMap<String, String>, filter: &str) -> Result<String, Error> {
     let mut defs = jaq_interpret::ParseCtx::new(Vec::new());
 
     let (f, errs) = jaq_parse::parse(filter, jaq_parse::main());
@@ -220,58 +250,156 @@ fn jq<'a>(value: serde_json::Value, filter: &str) -> Result<String, Error> {
 
     let inputs = jaq_interpret::RcIter::new(core::iter::empty());
 
+    let val = <jaq_interpret::Val as From<serde_json::Value>>::from(serde_json::json!(
+        vars[if vars.contains_key("THIS_NO_SHEBANG") {
+            "THIS_NO_SHEBANG"
+        } else {
+            "THIS"
+        }]
+    ));
+
     let mut out = jaq_interpret::FilterT::run(
         &f,
         (
             jaq_interpret::Ctx::new([], &inputs),
-            <jaq_interpret::Val as From<serde_json::Value>>::from(value),
+            val,
+            // jaq_interpret::Val::from(vars["config"].clone()),
         ),
     );
 
-    let mut results = Vec::new();
+    let mut results = Vec::<String>::new();
+    let mut errors = Vec::<jaq_interpret::Error>::new();
+    let mut last_err: Option<jaq_interpret::Error> = None;
     while let Some(val) = out.next() {
         match val {
             Ok(jaq_interpret::Val::Str(s)) => {
-                println!("one row: {}\n", &s);
+                println!("one row: \"{}\"\n", &s);
                 results.push(s.to_string())
             }
-            _ => {
-                return Err(Error::IOError(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Unexpected value",
-                )))
+            Ok(jaq_interpret::Val::Null) => todo!(),
+            Ok(jaq_interpret::Val::Bool(_)) => todo!(),
+            Ok(jaq_interpret::Val::Int(_)) => todo!(),
+            Ok(jaq_interpret::Val::Float(_)) => todo!(),
+            Ok(jaq_interpret::Val::Num(_)) => todo!(),
+            Ok(jaq_interpret::Val::Arr(_)) => todo!(),
+            Ok(jaq_interpret::Val::Obj(_)) => todo!(),
+            Err(e) => {
+                last_err = Some(e.clone());
+                errors.push(e)
             }
         }
     }
     println!("results: {:?}", results);
-
-    Ok(String::from_iter(results.into_iter()))
-}
-
-pub fn maybe_modify_string_via_shebang<'a, 'b>(
-    vars: &'a indexmap::IndexMap<String, String>,
-    s: &'b str,
-) -> Result<std::borrow::Cow<'b, str>, Error> {
-    if let Some((first_line, rest)) = s.split_once("\n") {
-        if first_line.starts_with("#!/") {
-            match first_line {
-                "#!/jq" =>
-                // `^ the `?` operator cannot be applied to type `Cow<'_, _>``
-                {
-                    match jq(serde_json::json!(vars["config"]), rest) {
-                        Ok(jq_ified) => Ok(std::borrow::Cow::Owned(jq_ified)),
-                        Err(e) => Err(e),
-                    }
-                }
-                "#!/echo" => Ok(std::borrow::Cow::Borrowed(rest)),
-                _ => unimplemented!("TODO: Generic shebang handling for: {}", first_line),
-            }
+    if let Some(first_error) = errors.first() {
+        if errors.len() == 1 {
+            Err(Error::Jaq(last_err.unwrap()))
         } else {
-            Ok(std::borrow::Cow::Borrowed(s))
+            /* temporary hack */
+            Err(Error::IOError(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("{}", first_error),
+            )))
         }
     } else {
-        Ok(std::borrow::Cow::Borrowed(s))
+        Ok(String::from_iter(results.into_iter()))
     }
+}
+
+pub fn execute_shebang<'a>(
+    vars: &'a mut indexmap::IndexMap<String, String>,
+    filter: &'a str,
+) -> Result<(), Error> {
+    print!("filter: \"{}\"\n", filter);
+    print!("vars: {:#?}\n", vars);
+
+    let process =
+        |first_line: &str, rest: &str| -> Result<(), Error> {
+            let shebang: String = if !first_line.starts_with("#!/") && vars.contains_key("SHELL") {
+                vars["SHELL"]
+            } else {
+                first_line.into_string()
+            };
+            match shebang {
+                "#!/jq" => {
+                    vars.insert(String::from("THIS_NO_SHEBANG"), String::from(rest));
+                    vars.insert(String::from("SHELL"), String::from(shebang));
+                    match jq(vars, filter) {
+                        Ok(jq_ified) => { vars["THIS"] = jq_ified; Ok(()) },
+                        Err(e) => Err(e),
+                        // `^ the `?` operator cannot be applied to type `Cow<'_, _>``
+                    }
+                }
+                "#!/echo" => { vars.insert(String::from("SHELL"), String::from(shebang)); Ok(()) },
+                _ => unimplemented!("TODO: Generic shebang handling for: {}", first_line),
+            }
+        };
+
+    let get_rest_key = || -> &'static str {
+        if vars.contains_key("THIS_NO_SHEBANG") {
+            "THIS_NO_SHEBANG"
+        } else {
+            "THIS"
+        }
+    };
+
+    if let Some(first_nl) = vars["THIS"].find('\n') {
+        if !vars.contains_key("THIS_FIRST_LINE") {
+            vars["THIS_FIRST_LINE"] = String::from(&vars["THIS"][..first_nl]);
+        }
+        process(&vars["THIS_FIRST_LINE"], &vars["THIS"][first_nl + 1..])
+    } else if vars.contains_key("THIS_FIRST_LINE") {
+        process(&vars["THIS_FIRST_LINE"], &vars[get_rest_key()])
+    } else if vars.contains_key("SHELL") {
+        process(&vars["SHELL"], &vars[get_rest_key()])
+    } else {
+        Ok(())
+    }
+}
+
+fn get_shell<'a>(vars: &'a indexmap::IndexMap<String, String>) -> Result<&'a str, Error> {
+    if vars.contains_key("SHELL") {
+        Ok(&vars["SHELL"])
+    } else if vars.contains_key("THIS_FIRST_LINE") {
+        Ok(&vars["THIS_FIRST_LINE"])
+    } else if let Some(first_nl) = vars["THIS"].find('\n') {
+        Ok(&vars["THIS"][..first_nl])
+    } else {
+        Err(Error::UnexpectedEmptiness)
+    }
+}
+
+pub fn prepend_vars(
+    mut input: String,
+    vars: indexmap::IndexMap<String, String>,
+) -> Result<(), Error> {
+    const VARS_TO_IGNORE: &'static [&'static str] = &["THIS", "THIS_FIRST_LINE", "SHELL"];
+    let shell: &str = get_shell(&vars)?;
+
+    match shell {
+        "#!/jq" => {
+            let defs: String = utils::join(
+                "\n",
+                vars.iter()
+                    .filter(|(k, _)| VARS_TO_IGNORE.contains(k.as_ref()))
+                    .map(|(k, v)| {
+                        utils::Concat((
+                            k,
+                            "=",
+                            v.trim().parse::<f64>().map_or_else(
+                                |_err| utils::Concat(('"', v, '"')).to_string(),
+                                |_ok| *v,
+                            ),
+                            ";",
+                        ))
+                    }),
+            );
+            input.insert_str(0, defs.as_str());
+            Ok(())
+        }
+        "#!/echo" => Ok(()),
+        _ => Err(Error::UnexpectedEmptiness),
+    }?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -479,12 +607,13 @@ mod tests {
 
     #[test]
     fn it_maybe_modify_string_via_shebang() {
-        let vars: indexmap::IndexMap<String, String> = indexmap::indexmap! {
-            String::from("config") => String::from("[\"Hello\", \"World\"]")
-        };
+        let mut vars: indexmap::IndexMap<String, String> = VARS.clone();
         const UNTOUCHED: &'static str = "UNTOUCHED";
-        let no_shebang = maybe_modify_string_via_shebang(&vars, UNTOUCHED).unwrap();
-        let jq_runs = maybe_modify_string_via_shebang(&vars, ".[]").unwrap();
+        let mut vars_unmodified: indexmap::IndexMap<String, String> = VARS.clone();
+        vars_unmodified["THIS"] = String::from(UNTOUCHED);
+        let no_shebang: std::borrow::Cow<str> =
+            execute_shebang(&mut vars_unmodified, UNTOUCHED).unwrap();
+        let jq_runs: std::borrow::Cow<str> = execute_shebang(&mut vars, ".[0]").unwrap();
         assert_eq!(no_shebang, UNTOUCHED);
         assert_eq!(jq_runs, String::from("\"Hello\"\n\"World\""));
     }
