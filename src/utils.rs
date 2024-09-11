@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 /// Concatenate display of the contents
 pub(crate) struct Concat<T>(pub T);
 
@@ -21,7 +23,7 @@ where
     let mut out = String::new();
     let mut iter = iter.into_iter();
     if let Some(fst) = iter.next() {
-        write!(&mut out, "{}", fst).unwrap();
+        out.write_str(fst).unwrap();
         for elt in iter {
             write!(&mut out, "{}{}", sep, elt).unwrap();
         }

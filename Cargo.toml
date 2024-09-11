@@ -5,14 +5,14 @@ edition = "2021"
 license = "Apache-2.0 OR MIT"
 
 [dependencies]
-serde = { version = "1.0.199", features = ["serde_derive"] }
-serde_json = "1.0.116"
-serde_derive = "1.0.199"
 indexmap = { version = "2.2.6", features = ["serde"] }
-toml = { version = "0.8.12", features = ["preserve_order"] }
-void = "1.0.2"
-lazy_static = "1.4.0"
-jaq-core = "1.2.1"
-jaq-parse = "1.0.2"
-jaq-std = "1.2.1"
-jaq-interpret = "1.2.1"
+jaq-core = { git = "https://github.com/01mf02/jaq", version = "2.0.0-alpha.1" }
+jaq-json = { git = "https://github.com/01mf02/jaq", version = "1.0.0-alpha", features = ["serde_json"] }
+jaq-std = { git = "https://github.com/01mf02/jaq", version = "2.0.0-alpha.1" }
+lazy_static = "^1.4"
+serde = { version = "^1", features = ["serde_derive"] }
+serde_derive = "^1"
+serde_json = "^1"
+strum = { version = "0.26.3", features = ["derive", "strum_macros"] }
+toml = { version = "^0.8", features = ["preserve_order"] }
+void = "^1"
