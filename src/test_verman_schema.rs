@@ -1,5 +1,4 @@
 use crate::constants::VARS;
-use crate::execute_shebang;
 use crate::models::{
     Component, Constraint, Mount, ProtocolConfiguration, Root, ServerConfiguration, State,
     StateValues, VermanConfig,
@@ -156,7 +155,7 @@ fn it_serdes() {
                     Mount {
                         when: String::from("any(.; .component[].mounts[]?.action | startswith(\"nginx::\"))"),
                         uri: Some(String::from("/api/ruby")),
-                        src_uri: Some(String(".component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"ruby\"])).dst_uri")),
+                        src_uri: Some(String::from(".component[] | select(.constraints | any([.kind, .required_variant] == [\"lang\", \"ruby\"])).dst_uri")),
                         action: String::from("mount::expose"),
                         action_args: None,
                     },
@@ -211,8 +210,8 @@ fn it_maybe_modify_string_via_shebang() {
     let mut vars_unmodified: indexmap::IndexMap<String, String> = VARS.clone();
     vars_unmodified["THIS"] = String::from(UNTOUCHED);
     let no_shebang: std::borrow::Cow<str> =
-        execute_shebang(&mut vars_unmodified, UNTOUCHED).unwrap();
-    let jq_runs: std::borrow::Cow<str> = execute_shebang(&mut vars, ".[0]").unwrap();
+        crate::commands::shebang::execute_shebang(&mut vars_unmodified, UNTOUCHED).unwrap();
+    let jq_runs: std::borrow::Cow<str> = crate::commands::jaq::jaq(&mut vars, ".[0]").unwrap();
     assert_eq!(no_shebang, UNTOUCHED);
     assert_eq!(jq_runs, String::from("\"Hello\"\n\"World\""));
 }

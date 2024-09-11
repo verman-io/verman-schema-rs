@@ -9,11 +9,11 @@ pub enum VermanSchemaError {
 
     /// Depressing
     #[strum(to_string = "UnexpectedEmptiness")]
-    UnexpectedEmptiness=680,
+    UnexpectedEmptiness = 680,
     #[strum(to_string = "ParsingError")]
-    ParsingError=681,
+    ParsingError = 681,
     #[strum(to_string = "CompilationError")]
-    CompilationError=682,
+    CompilationError = 682,
 
     // ************************
     // * Library level errors *
@@ -118,13 +118,13 @@ impl<T: std::any::Any> std::process::Termination for SuccessOrVermanSchemaError<
 
         match self {
             SuccessOrVermanSchemaError::Ok(e)
-            if std::any::TypeId::of::<T>()
-                == std::any::TypeId::of::<std::process::ExitCode>() =>
-                {
-                    *(&e as &dyn std::any::Any)
-                        .downcast_ref::<std::process::ExitCode>()
-                        .unwrap()
-                }
+                if std::any::TypeId::of::<T>()
+                    == std::any::TypeId::of::<std::process::ExitCode>() =>
+            {
+                *(&e as &dyn std::any::Any)
+                    .downcast_ref::<std::process::ExitCode>()
+                    .unwrap()
+            }
             SuccessOrVermanSchemaError::Ok(_) => std::process::ExitCode::SUCCESS,
             SuccessOrVermanSchemaError::Err(err) => match err {
                 VermanSchemaError::StdIoError { ref error } if error.raw_os_error().is_some() => {
