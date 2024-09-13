@@ -5,11 +5,13 @@ edition = "2021"
 license = "Apache-2.0 OR MIT"
 
 [dependencies]
+hifijson = "0.2.0"
 indexmap = { version = "2.2.6", features = ["serde"] }
 jaq-core = { git = "https://github.com/01mf02/jaq", version = "2.0.0-alpha.1" }
 jaq-json = { git = "https://github.com/01mf02/jaq", version = "1.0.0-alpha", features = ["serde_json"] }
 jaq-std = { git = "https://github.com/01mf02/jaq", version = "2.0.0-alpha.1" }
 lazy_static = "^1.4"
+memmap2 = "0.9"
 serde = { version = "^1", features = ["serde_derive"] }
 serde_derive = "^1"
 serde_json = "^1"
