@@ -1,24 +1,25 @@
 use std::io::Write;
 
-use crate::commands::jaq::jaq_utils::vars_filter_from_code;
 use crate::error::VermanSchemaError;
 
 mod jaq_utils;
 
-pub fn jaq<'a>(content: Vec<jaq_json::Val>, query: &str) -> Result<String, VermanSchemaError> {
-    let inputs = Box::new(std::iter::once(Ok(jaq_json::Val::Arr(std::rc::Rc::new(
-        content,
-    )))));
+pub fn jaq(json: String, filter: String) -> Result<String, VermanSchemaError> {
 
-    let (vars, filter) = vars_filter_from_code(query).unwrap();
+    let input = Box::new(std::iter::once({
+            let json: serde_json::Value = serde_json::from_str(json.as_str())?;
+            Ok(jaq_json::Val::from(json))
+        }
+    ));
+    let (vars, filter) = jaq_utils::vars_filter_from_code(filter.as_str()).unwrap();
 
     let mut buf = Vec::<u8>::new();
-    let _result: bool = jaq_runner(&filter, vars.clone(), false, inputs, |v| {
+    let _result: bool = jaq_runner(&filter, vars.clone(), false, input, |v| {
         buf.write_all(v.to_string().as_bytes())
     })?
-    .ok_or_else(|| VermanSchemaError::NotFound(""))?;
-    Ok(String::from(std::str::from_utf8(buf.as_slice())?))
+        .ok_or_else(|| VermanSchemaError::JaqStrError(String::from("`jaq_runner` failed")))?;
     /*assert!(_result);*/
+    std::str::from_utf8(buf.as_slice()).map_err(From::from).map(ToString::to_string)
 }
 
 fn jaq_runner(

@@ -1,63 +1,3 @@
-use crate::error::VermanSchemaError;
-
-fn jaq_error_mapper(error: jaq_core::compile::Errors<&str>) -> VermanSchemaError {
-    VermanSchemaError::JaqStrError(
-        error
-            .iter()
-            .map(|(f, err_vec)| -> String {
-                String::from(format!(
-                    "{:?}{:?}",
-                    f,
-                    err_vec
-                        .iter()
-                        .map(|er| format!("{:?}", er))
-                        .reduce(|s0, s1| s0 + s1.as_str())
-                        .unwrap_or(String::new())
-                ))
-            })
-            .reduce(|s0, s1| s0 + s1.as_str())
-            .unwrap_or(String::new()),
-    )
-}
-
-// Next 4 definitions are from https://github.com/01mf02/jaq/blob/7b9ce5b/jaq-core/tests/common/mod.rs
-// but modified to not panic
-fn yields(
-    x: jaq_json::Val,
-    code: &str,
-    ys: impl Iterator<Item = jaq_json::ValR>,
-) -> Result<(), VermanSchemaError> {
-    use jaq_core::load::{Arena, File, Loader};
-    use jaq_core::{Compiler, Native};
-
-    let arena = Arena::default();
-    let loader = Loader::new([]);
-    let path = "".into();
-    let modules = loader
-        .load(&arena, File { path, code })
-        .map_err(|e| -> VermanSchemaError { e.iter().map() });
-    let filter = Compiler::<_, Native<_>>::default()
-        .compile(modules)
-        .map_err(jaq_error_mapper)?;
-    Ok(filter.yields(x, ys))
-}
-
-pub fn fail(x: serde_json::Value, f: &str, err: jaq_json::Error) -> Result<(), VermanSchemaError> {
-    yields(x.into(), f, core::iter::once(Err(err)))
-}
-
-pub fn give(x: serde_json::Value, f: &str, y: serde_json::Value) -> Result<(), VermanSchemaError> {
-    yields(x.into(), f, core::iter::once(Ok(y.into())))
-}
-
-pub fn gives<const N: usize>(
-    x: serde_json::Value,
-    f: &str,
-    ys: [serde_json::Value; N],
-) -> Result<(), VermanSchemaError> {
-    yields(x.into(), f, ys.into_iter().map(|y| Ok(y.into())))
-}
-
 pub(crate) fn vars_filter_from_code(
     code: &str,
 ) -> std::io::Result<(
@@ -70,14 +10,14 @@ pub(crate) fn vars_filter_from_code(
         &[String::from("ARGS"), String::from("ENV")],
         &[],
     )
-    .map_err(|e| {
-        let mut tmp = Vec::<u8>::with_capacity(e.len());
-        e.iter().for_each(
-            /* fold kept trying to make it a `&[u8]` */
-            |elem| tmp.extend(format!("{:?}", elem).as_bytes()),
-        );
-        std::io::Error::other(std::str::from_utf8(tmp.as_slice()).unwrap())
-    })
+        .map_err(|e| {
+            let mut tmp = Vec::<u8>::with_capacity(e.len());
+            e.iter().for_each(
+                /* fold kept trying to make it a `&[u8]` */
+                |elem| tmp.extend(format!("{:?}", elem).as_bytes()),
+            );
+            std::io::Error::other(std::str::from_utf8(tmp.as_slice()).unwrap())
+        })
 }
 
 #[derive(Clone, Debug)]
@@ -89,7 +29,7 @@ enum Color {
 type StringColors = Vec<(String, Option<Color>)>;
 
 #[derive(Debug)]
-struct Report {
+pub(crate) struct Report {
     message: String,
     labels: Vec<(core::ops::Range<usize>, StringColors, Color)>,
 }
@@ -213,7 +153,7 @@ fn json_array(path: impl AsRef<std::path::Path>) -> std::io::Result<jaq_json::Va
     json_slice(&load_file(path.as_ref())?).collect()
 }
 
-fn parse(
+pub(crate) fn parse(
     path: &str,
     code: &str,
     vars: &[String],
@@ -242,7 +182,7 @@ fn parse(
         vals.push(json_array(path).map_err(|e| e.to_string())?);
         Ok(())
     })
-    .map_err(load_errors)?;
+        .map_err(load_errors)?;
 
     let compiler = Compiler::default()
         .with_funs(jaq_std::funs().chain(jaq_json::funs()))

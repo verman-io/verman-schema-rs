@@ -24,6 +24,9 @@ pub enum VermanSchemaError {
     #[strum(to_string = "{0:?}")]
     ExitCode(std::process::ExitCode) = 710,
 
+    #[strum(to_string = "`serde_json::Error` error. {error:?}")]
+    SerdeJsonError { error: serde_json::Error } = 721,
+
     #[strum(to_string = "`std::str::Utf8Error` error. {error:?}")]
     Utf8Error { error: std::str::Utf8Error } = 739,
 
@@ -60,6 +63,12 @@ impl From<std::io::Error> for VermanSchemaError {
 impl From<std::str::Utf8Error> for VermanSchemaError {
     fn from(error: std::str::Utf8Error) -> Self {
         Self::Utf8Error { error }
+    }
+}
+
+impl From<serde_json::error::Error> for VermanSchemaError {
+    fn from(error: serde_json::error::Error) -> Self {
+        Self::SerdeJsonError { error }
     }
 }
 
