@@ -1,20 +1,18 @@
+#![feature(try_trait_v2)]
 #![feature(iter_collect_into)]
+extern crate core;
 
-mod constants;
+pub mod models;
 
-mod error;
-mod utils;
-
-mod models;
+#[path = "task/lib.rs"]
+pub mod task;
 
 #[path = "commands/lib.rs"]
-mod commands;
+pub mod commands;
+mod errors;
 
-extern crate jaq_core;
-extern crate serde;
-#[macro_use]
-extern crate lazy_static;
+#[path = "pipeline/lib.rs"]
+pub mod pipeline;
 
 #[cfg(test)]
-#[path = "test_verman_schema.rs"]
-mod tests;
+mod test_models;

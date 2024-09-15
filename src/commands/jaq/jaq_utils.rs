@@ -10,14 +10,14 @@ pub(crate) fn vars_filter_from_code(
         &[String::from("ARGS"), String::from("ENV")],
         &[],
     )
-        .map_err(|e| {
-            let mut tmp = Vec::<u8>::with_capacity(e.len());
-            e.iter().for_each(
-                /* fold kept trying to make it a `&[u8]` */
-                |elem| tmp.extend(format!("{:?}", elem).as_bytes()),
-            );
-            std::io::Error::other(std::str::from_utf8(tmp.as_slice()).unwrap())
-        })
+    .map_err(|e| {
+        let mut tmp = Vec::<u8>::with_capacity(e.len());
+        e.iter().for_each(
+            /* fold kept trying to make it a `&[u8]` */
+            |elem| tmp.extend(format!("{:?}", elem).as_bytes()),
+        );
+        std::io::Error::other(std::str::from_utf8(tmp.as_slice()).unwrap())
+    })
 }
 
 #[derive(Clone, Debug)]
@@ -182,7 +182,7 @@ pub(crate) fn parse(
         vals.push(json_array(path).map_err(|e| e.to_string())?);
         Ok(())
     })
-        .map_err(load_errors)?;
+    .map_err(load_errors)?;
 
     let compiler = Compiler::default()
         .with_funs(jaq_std::funs().chain(jaq_json::funs()))
