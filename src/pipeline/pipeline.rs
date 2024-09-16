@@ -1,4 +1,4 @@
-use crate::errors::VermanError;
+use crate::errors::VermanSchemaError;
 use crate::models::{CommonContent, Pipeline};
 use crate::task::task::process_tasks_serially;
 
@@ -19,7 +19,7 @@ impl Default for Pipeline {
 }
 
 impl Pipeline {
-    pub async fn process(&self) -> Result<CommonContent, VermanError> {
+    pub async fn process(&self) -> Result<CommonContent, VermanSchemaError> {
         let pretty_name = format!(
             "{}@{} from {}\n{}",
             self.name, self.version, self.url, self.description

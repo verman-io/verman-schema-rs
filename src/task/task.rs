@@ -1,12 +1,11 @@
 use crate::commands::{CommandArgs, CommandName};
-use crate::errors::VermanError;
+use crate::errors::VermanSchemaError;
 use crate::models::{CommonContent, Task};
-use either::Either;
 
 pub async fn process_tasks_serially(
     pipeline_name: &String,
     tasks: &indexmap::IndexMap<String, Task>,
-) -> Result<CommonContent, VermanError> {
+) -> Result<CommonContent, VermanSchemaError> {
     let mut shared_env_for_tasks =
         indexmap::IndexMap::<String, either::Either<String, Vec<u8>>>::new();
 
@@ -37,7 +36,7 @@ pub async fn process_tasks_serially(
         }
         shared_env_for_tasks.insert(
             String::from("PREVIOUS_TASK_NAME"),
-            Either::Left(task_name.to_string()),
+            either::Either::Left(task_name.to_string()),
         );
         /*
         alternatively could add a `Vec<u8>` or `bytes` or `impl std::io::Read` field to
@@ -47,8 +46,8 @@ pub async fn process_tasks_serially(
             shared_env_for_tasks.insert(
                 String::from(previous_task_string_key!()),
                 std::str::from_utf8(vec_u8)
-                    .map(|s| Either::Left(s.to_owned()))
-                    .unwrap_or(Either::Right(vec_u8.to_vec())),
+                    .map(|s| either::Either::Left(s.to_owned()))
+                    .unwrap_or(either::Either::Right(vec_u8.to_vec())),
             );
         }
     }
@@ -63,14 +62,14 @@ impl Task {
         &self,
         pipeline_name: &String,
         task_name: &String,
-    ) -> Result<CommonContent, VermanError> {
+    ) -> Result<CommonContent, VermanSchemaError> {
         let mut shared_env_for_cmds =
             indexmap::IndexMap::<String, either::Either<String, Vec<u8>>>::new();
-        let mut last_result: Result<CommonContent, VermanError> =
-            Err(VermanError::NotFound("`Command`s"));
+        let mut last_result: Result<CommonContent, VermanSchemaError> =
+            Err(VermanSchemaError::NotFound("`Command`s"));
         for command in &self.commands {
             /* if !CommandName::VARIANTS.contains(command.cmd) {
-                return Err(VermanError::NotInstalled(command.cmd.to_owned()))
+                return Err(VermanSchemaError::NotInstalled(command.cmd.to_owned()))
             } */
             last_result = match command.cmd {
                 CommandName::Echo => match command.args {
@@ -121,7 +120,7 @@ impl Task {
                             };
                         }
                         log::warn!(no_http_arg_error!());
-                        return Err(VermanError::TaskFailedToStart(String::from(
+                        return Err(VermanSchemaError::TaskFailedToStart(String::from(
                             no_http_arg_error!(),
                         ))); // fail early on a http error
                     }
@@ -143,7 +142,9 @@ impl Task {
 
                         Ok(crate::commands::set_env::set_env(&common_with_merged_env)?)
                     }
-                    _ => Err(VermanError::TaskFailedToStart(String::from("set_env"))),
+                    _ => Err(VermanSchemaError::TaskFailedToStart(String::from(
+                        "set_env",
+                    ))),
                 },
                 CommandName::Jaq => match command.args {
                     Some(CommandArgs::Jaq(ref arg)) => {
@@ -162,7 +163,7 @@ impl Task {
 
                         Ok(crate::commands::jaq::jaq(&common_with_merged_env)?)
                     }
-                    _ => Err(VermanError::TaskFailedToStart(String::from("jaq"))),
+                    _ => Err(VermanSchemaError::TaskFailedToStart(String::from("jaq"))),
                 },
             }; /* fail at first failing task, without retries or force continuing */
             if let Ok(common) = last_result {
@@ -171,8 +172,8 @@ impl Task {
                 }
                 if let Some(vec_u8) = common.content.as_ref() {
                     let task_content = std::str::from_utf8(vec_u8)
-                        .map(|s| Either::Left(s.to_owned()))
-                        .unwrap_or(Either::Right(vec_u8.to_vec()));
+                        .map(|s| either::Either::Left(s.to_owned()))
+                        .unwrap_or(either::Either::Right(vec_u8.to_vec()));
 
                     shared_env_for_cmds
                         .insert(String::from("PREVIOUS_TASK_CONTENT"), task_content.clone());

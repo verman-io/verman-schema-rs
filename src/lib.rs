@@ -4,6 +4,8 @@ extern crate core;
 
 pub mod models;
 
+pub mod verman_schema;
+
 #[path = "task/lib.rs"]
 pub mod task;
 

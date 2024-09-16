@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use serde::ser::SerializeSeq;
-
 use crate::commands::{CommandArgs, CommandName};
 
 #[derive(Debug, serde_derive::Deserialize, serde_derive::Serialize)]
@@ -120,7 +118,11 @@ pub struct CommonContent {
     )]
     pub content: Option<Vec<u8>>, /* Option<impl std::io::Read> */
 
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "de_opt_indexmap_str_or_bytes",
+        serialize_with = "se_opt_indexmap_str_or_bytes"
+    )]
     pub env: Option<indexmap::IndexMap<String, either::Either<String, Vec<u8>>>>,
 }
 
@@ -165,6 +167,8 @@ fn se__utf8_else_vecu8<S>(opt_value: &Option<Vec<u8>>, serializer: S) -> Result<
 where
     S: serde::Serializer,
 {
+    use serde::ser::SerializeSeq;
+
     match opt_value {
         Some(vec) => match std::str::from_utf8(vec) {
             Ok(utf8_str) => serializer.serialize_str(utf8_str),
@@ -177,6 +181,123 @@ where
             }
         },
         _ => serializer.serialize_none(),
+    }
+}
+
+pub fn de_opt_indexmap_str_or_bytes<'de, D>(
+    deserializer: D,
+) -> Result<Option<indexmap::IndexMap<String, either::Either<String, Vec<u8>>>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct MapVisitor;
+
+    impl<'de> serde::de::Visitor<'de> for MapVisitor {
+        type Value = indexmap::IndexMap<String, either::Either<String, Vec<u8>>>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a map with string keys and either string or byte array values")
+        }
+
+        fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::MapAccess<'de>,
+        {
+            let mut index_map = indexmap::IndexMap::new();
+            while let Some((key, value)) = map.next_entry::<String, serde_json::Value>()? {
+                let either_value = match value {
+                    // If it's a string we treat it as Either::Left (String)
+                    serde_json::Value::String(s) => either::Either::Left(s),
+
+                    // If it's an array of numbers, we process it as Either::Right (Vec<u8>)
+                    serde_json::Value::Array(arr) => {
+                        let bytes: Result<Vec<u8>, _> = arr
+                            .into_iter()
+                            .map(|v| match v {
+                                serde_json::Value::Number(n) => n
+                                    .as_u64()
+                                    .filter(|&val| val <= u8::MAX as u64)
+                                    .map(|val| val as u8)
+                                    .ok_or_else(|| serde::de::Error::custom("Invalid byte value")),
+                                _ => Err(serde::de::Error::custom("Expected byte values")),
+                            })
+                            .collect();
+                        either::Either::Right(bytes?)
+                    }
+
+                    _ => {
+                        return Err(serde::de::Error::custom(
+                            "Invalid value type for IndexMap value",
+                        ))
+                    }
+                };
+                index_map.insert(key, either_value);
+            }
+            Ok(index_map)
+        }
+    }
+
+    deserializer.deserialize_option(VisitorOptionMap(MapVisitor))
+}
+
+pub struct VisitorOptionMap<T>(T);
+
+impl<'de, T> serde::de::Visitor<'de> for VisitorOptionMap<T>
+where
+    T: serde::de::Visitor<'de>,
+{
+    type Value = Option<T::Value>;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.0.expecting(formatter)
+    }
+
+    fn visit_none<E>(self) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(None)
+    }
+
+    fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Some(self.0.visit_some(deserializer)?))
+    }
+}
+
+pub fn se_opt_indexmap_str_or_bytes<S>(
+    kv_opt: &Option<indexmap::IndexMap<String, either::Either<String, Vec<u8>>>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    use serde::ser::SerializeMap;
+
+    if let Some(ref index_map) = kv_opt {
+        let mut map_ser = serializer.serialize_map(Some(index_map.len()))?;
+        for (key, value) in index_map {
+            match value {
+                either::Either::Left(s) => {
+                    // Serialize string directly as a string
+                    map_ser.serialize_entry(key, s)?;
+                }
+                either::Either::Right(vec) => {
+                    if let Ok(utf8_str) = std::str::from_utf8(vec) {
+                        // It can be represented as a valid UTF-8 string
+                        map_ser.serialize_entry(key, utf8_str)?;
+                    } else {
+                        // It's not valid UTF-8, serialize as a number array (i.e., sequence of bytes)
+                        map_ser.serialize_entry(key, &vec)?;
+                    }
+                }
+            }
+        }
+        map_ser.end()
+    } else {
+        serializer.serialize_none()
     }
 }
 

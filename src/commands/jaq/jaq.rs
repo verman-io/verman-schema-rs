@@ -1,20 +1,20 @@
 use std::io::Write;
 
-use crate::errors::VermanError;
+use crate::errors::VermanSchemaError;
 use crate::models::CommonContent;
 
 mod jaq_utils;
 
-pub fn jaq(common_content: &CommonContent) -> Result<CommonContent, VermanError> {
+pub fn jaq(common_content: &CommonContent) -> Result<CommonContent, VermanSchemaError> {
     let content = common_content.content.clone();
     let env = common_content.env.clone();
 
     let input = Box::new(std::iter::once(Ok(match env {
-        None => Err(VermanError::NotFound("Any content")),
+        None => Err(VermanSchemaError::NotFound("Any content")),
         Some(envi) => {
             let json: serde_json::Value = serde_json::from_str(
                 envi.get(&String::from("PREVIOUS_TASK_CONTENT"))
-                    .ok_or_else(|| VermanError::NotFound("Any content"))?
+                    .ok_or_else(|| VermanSchemaError::NotFound("Any content"))?
                     .to_owned()
                     .left()
                     .unwrap()
@@ -23,7 +23,7 @@ pub fn jaq(common_content: &CommonContent) -> Result<CommonContent, VermanError>
             Ok(jaq_json::Val::from(json))
         }
     }?)));
-    let content_vec = content.ok_or_else(|| VermanError::NotFound("Any filter"))?;
+    let content_vec = content.ok_or_else(|| VermanSchemaError::NotFound("Any filter"))?;
     let filter = std::str::from_utf8(content_vec.as_slice())?;
 
     let (vars, filter) = jaq_utils::vars_filter_from_code(filter)?;
@@ -32,7 +32,7 @@ pub fn jaq(common_content: &CommonContent) -> Result<CommonContent, VermanError>
     let _result: bool = jaq_runner(&filter, vars.clone(), false, input, |v| {
         buf.write_all(v.to_string().as_bytes())
     })?
-    .ok_or_else(|| VermanError::JaqStrError(String::from("`jaq_runner` failed")))?;
+    .ok_or_else(|| VermanSchemaError::JaqStrError(String::from("`jaq_runner` failed")))?;
     /*assert!(_result);*/
     Ok(CommonContent {
         content: Some(buf),

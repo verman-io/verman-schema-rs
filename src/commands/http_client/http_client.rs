@@ -1,11 +1,11 @@
-use crate::errors::VermanError;
-use crate::models::{CommonContent, HttpCommandArgs};
-use either::Either;
 use std::str::FromStr;
+
+use crate::errors::VermanSchemaError;
+use crate::models::{CommonContent, HttpCommandArgs};
 
 pub async fn http(
     http_command_args: &HttpCommandArgs,
-) -> Result<(Option<reqwest::Response>, CommonContent), VermanError> {
+) -> Result<(Option<reqwest::Response>, CommonContent), VermanSchemaError> {
     /*******************
      * Prepare request *
      *******************/
@@ -16,8 +16,8 @@ pub async fn http(
         .to_owned()
         .unwrap_or_else(|| indexmap::IndexMap::<String, either::Either<String, Vec<u8>>>::new());
     body = body.or(env.get("PREVIOUS_TASK_CONTENT").map(|s_or_v| match s_or_v {
-        Either::Left(s) => s.to_owned().into_bytes(),
-        Either::Right(v) => v.to_owned(),
+        either::Either::Left(s) => s.to_owned().into_bytes(),
+        either::Either::Right(v) => v.to_owned(),
     }));
 
     let mut args = http_command_args.args.to_owned();
@@ -25,7 +25,7 @@ pub async fn http(
         /* Do interpolation and ensure input is set */
         let mut hm = std::collections::HashMap::<String, String>::with_capacity(env.len());
         for (k, either_v) in env.iter() {
-            if let Either::Left(v) = either_v {
+            if let either::Either::Left(v) = either_v {
                 hm.insert(k.to_owned(), v.to_string());
             }
         }
@@ -61,7 +61,7 @@ pub async fn http(
 
     let status_code = res.status().as_u16();
     if status_code != http_command_args.expectation.status_code {
-        return Err(VermanError::HttpError(status_code));
+        return Err(VermanSchemaError::HttpError(status_code));
     }
     let headers = res.headers().clone();
     let content_type_opt = headers.get("Content-Type").map(|e| e.to_str().unwrap());
@@ -95,14 +95,23 @@ pub async fn http(
                 },
             ))
         }
-        _ => Ok((Some(res), CommonContent::default())),
+        content_type @ _ => Ok((
+            None,
+            CommonContent {
+                env: Some(indexmap::indexmap! {
+                    String::from("PREVIOUS_TASK_CONTENT") => either::Right(res.bytes().await?.to_vec()),
+                    String::from("PREVIOUS_TASK_TYPE") => either::Left(String::from(content_type.unwrap()))
+                }),
+                ..CommonContent::default()
+            },
+        )),
     }
 }
 
 #[allow(non_snake_case)]
 fn indexmap_of_ValueNoObj_to_HeaderMap(
     v: &Vec<indexmap::IndexMap<String, serde_json_extensions::ValueNoObjOrArr>>,
-) -> Result<http::header::HeaderMap, VermanError> {
+) -> Result<http::header::HeaderMap, VermanSchemaError> {
     let mut headers = http::header::HeaderMap::with_capacity(v.len());
     for index_map in v.iter() {
         for (k, v) in index_map.iter() {
@@ -118,7 +127,7 @@ fn indexmap_of_ValueNoObj_to_HeaderMap(
 
 fn header_value_from_value_no_obj(
     v: &serde_json_extensions::ValueNoObjOrArr,
-) -> Result<http::header::HeaderValue, VermanError> {
+) -> Result<http::header::HeaderValue, VermanSchemaError> {
     match v {
         serde_json_extensions::ValueNoObjOrArr::Null => {
             Ok(http::header::HeaderValue::from_bytes(b"")?)

@@ -371,8 +371,10 @@ async fn one_set_env_one_echo_one_http_command_one_jaq_in_one_task_pipeline_test
     };
     let common = pipeline6.process().await.unwrap();
     let env = common.env.unwrap();
+    /*
     println!("{}", serde_json::to_string(&pipeline6).unwrap());
     println!("{}", toml::to_string(&pipeline6).unwrap());
+    */
     assert_eq!(
         env.get("PREVIOUS_TASK_NAME")
             .unwrap()

@@ -5,7 +5,7 @@ use std::string::ToString;
     strum::AsRefStr, strum::Display, strum::EnumDiscriminants, strum::IntoStaticStr, Debug,
 )]
 #[repr(u16)]
-pub enum VermanError {
+pub enum VermanSchemaError {
     #[strum(to_string = "NotFound({0:#?})")]
     NotFound(&'static str) = 404,
 
@@ -78,93 +78,93 @@ pub enum VermanError {
     JaqStrError(String) = 742,
 }
 
-impl VermanError {
+impl VermanSchemaError {
     fn discriminant(&self) -> u16 {
         unsafe { *<*const _>::from(self).cast::<u16>() }
     }
 }
 
-impl From<std::io::Error> for VermanError {
+impl From<std::io::Error> for VermanSchemaError {
     fn from(error: std::io::Error) -> Self {
         Self::StdIoError { error }
     }
 }
 
-impl From<toml::de::Error> for VermanError {
+impl From<toml::de::Error> for VermanSchemaError {
     fn from(error: toml::de::Error) -> Self {
         Self::TomlDeError { error }
     }
 }
 
-impl From<std::process::ExitCode> for VermanError {
+impl From<std::process::ExitCode> for VermanSchemaError {
     fn from(error: std::process::ExitCode) -> Self {
         Self::ExitCode(error)
     }
 }
 
-impl From<std::str::Utf8Error> for VermanError {
+impl From<std::str::Utf8Error> for VermanSchemaError {
     fn from(error: std::str::Utf8Error) -> Self {
         Self::Utf8Error { error }
     }
 }
 
-impl From<serde_json::error::Error> for VermanError {
+impl From<serde_json::error::Error> for VermanSchemaError {
     fn from(error: serde_json::error::Error) -> Self {
         Self::SerdeJsonError { error }
     }
 }
 
-impl From<reqwest::Error> for VermanError {
+impl From<reqwest::Error> for VermanSchemaError {
     fn from(error: reqwest::Error) -> Self {
         Self::ReqwestError { error }
     }
 }
 
-impl From<http::header::InvalidHeaderName> for VermanError {
+impl From<http::header::InvalidHeaderName> for VermanSchemaError {
     fn from(error: http::header::InvalidHeaderName) -> Self {
         Self::InvalidHeaderName { error }
     }
 }
 
-impl From<http::header::InvalidHeaderValue> for VermanError {
+impl From<http::header::InvalidHeaderValue> for VermanSchemaError {
     fn from(error: http::header::InvalidHeaderValue) -> Self {
         Self::InvalidHeaderValue { error }
     }
 }
 
-impl From<http::method::InvalidMethod> for VermanError {
+impl From<http::method::InvalidMethod> for VermanSchemaError {
     fn from(error: http::method::InvalidMethod) -> Self {
         Self::InvalidMethod { error }
     }
 }
 
-impl From<http::uri::InvalidUri> for VermanError {
+impl From<http::uri::InvalidUri> for VermanSchemaError {
     fn from(error: http::uri::InvalidUri) -> Self {
         Self::InvalidUri { error }
     }
 }
 
-impl From<serde_json_extensions::error::Error> for VermanError {
+impl From<serde_json_extensions::error::Error> for VermanSchemaError {
     fn from(error: serde_json_extensions::error::Error) -> Self {
         Self::SerdeJsonExtensionsError { error }
     }
 }
 
-impl From<subst::Error> for VermanError {
+impl From<subst::Error> for VermanSchemaError {
     fn from(error: subst::Error) -> Self {
         Self::SubstError { error }
     }
 }
 
-impl From<jaq_json::Error> for VermanError {
+impl From<jaq_json::Error> for VermanSchemaError {
     fn from(error: jaq_json::Error) -> Self {
         Self::JaqJsonError { error }
     }
 }
 
-impl std::process::Termination for VermanError {
+impl std::process::Termination for VermanSchemaError {
     fn report(self) -> std::process::ExitCode {
-        if let VermanError::ExitCode(exit_code) = self {
+        if let VermanSchemaError::ExitCode(exit_code) = self {
             return exit_code;
         }
         let status_code = self.discriminant();
@@ -177,23 +177,23 @@ impl std::process::Termination for VermanError {
     }
 }
 
-pub enum SuccessOrVermanError<T> {
+pub enum SuccessOrVermanSchemaError<T> {
     Ok(T),
-    Err(VermanError),
+    Err(VermanSchemaError),
 }
 
-impl<T> From<Result<T, VermanError>> for SuccessOrVermanError<T> {
-    fn from(value: Result<T, VermanError>) -> Self {
+impl<T> From<Result<T, VermanSchemaError>> for SuccessOrVermanSchemaError<T> {
+    fn from(value: Result<T, VermanSchemaError>) -> Self {
         match value {
-            Ok(val) => SuccessOrVermanError::Ok(val),
-            Err(error) => SuccessOrVermanError::Err(error),
+            Ok(val) => SuccessOrVermanSchemaError::Ok(val),
+            Err(error) => SuccessOrVermanSchemaError::Err(error),
         }
     }
 }
 
 // Can't use `Result` because
 // [E0117] Only traits defined in the current crate can be implemented for arbitrary types
-impl<T: std::any::Any> std::process::Termination for SuccessOrVermanError<T> {
+impl<T: std::any::Any> std::process::Termination for SuccessOrVermanSchemaError<T> {
     fn report(self) -> std::process::ExitCode {
         const PROCESS_EXIT_CODE: fn(i32) -> std::process::ExitCode = |e: i32| {
             if e > u8::MAX as i32 {
@@ -210,7 +210,7 @@ impl<T: std::any::Any> std::process::Termination for SuccessOrVermanError<T> {
         }; */
 
         match self {
-            SuccessOrVermanError::Ok(e)
+            SuccessOrVermanSchemaError::Ok(e)
                 if std::any::TypeId::of::<T>()
                     == std::any::TypeId::of::<std::process::ExitCode>() =>
             {
@@ -218,14 +218,14 @@ impl<T: std::any::Any> std::process::Termination for SuccessOrVermanError<T> {
                     .downcast_ref::<std::process::ExitCode>()
                     .unwrap()
             }
-            SuccessOrVermanError::Ok(_) => std::process::ExitCode::SUCCESS,
-            SuccessOrVermanError::Err(err) => match err {
-                VermanError::StdIoError { ref error } if error.raw_os_error().is_some() => {
+            SuccessOrVermanSchemaError::Ok(_) => std::process::ExitCode::SUCCESS,
+            SuccessOrVermanSchemaError::Err(err) => match err {
+                VermanSchemaError::StdIoError { ref error } if error.raw_os_error().is_some() => {
                     let e = unsafe { error.raw_os_error().unwrap_unchecked() };
                     eprintln!("{}", e.to_string());
                     PROCESS_EXIT_CODE(e)
                 }
-                VermanError::ExitCode(exit_code) => exit_code,
+                VermanSchemaError::ExitCode(exit_code) => exit_code,
                 _ => {
                     eprintln!("{}", err.to_string());
                     err.report()
@@ -235,19 +235,19 @@ impl<T: std::any::Any> std::process::Termination for SuccessOrVermanError<T> {
     }
 }
 
-// TODO: Get `Into<VermanError>` syntax working
-impl std::ops::FromResidual<Result<std::convert::Infallible, VermanError>>
-    for SuccessOrVermanError<std::process::ExitCode>
+// TODO: Get `Into<VermanSchemaError>` syntax working
+impl std::ops::FromResidual<Result<std::convert::Infallible, VermanSchemaError>>
+    for SuccessOrVermanSchemaError<std::process::ExitCode>
 {
-    fn from_residual(residual: Result<std::convert::Infallible, VermanError>) -> Self {
-        SuccessOrVermanError::Err(residual./*into_*/err().unwrap())
+    fn from_residual(residual: Result<std::convert::Infallible, VermanSchemaError>) -> Self {
+        SuccessOrVermanSchemaError::Err(residual./*into_*/err().unwrap())
     }
 }
 
 impl std::ops::FromResidual<Result<std::convert::Infallible, std::io::Error>>
-    for SuccessOrVermanError<std::process::ExitCode>
+    for SuccessOrVermanSchemaError<std::process::ExitCode>
 {
     fn from_residual(residual: Result<std::convert::Infallible, std::io::Error>) -> Self {
-        SuccessOrVermanError::Err(VermanError::from(residual./*into_*/err().unwrap()))
+        SuccessOrVermanSchemaError::Err(VermanSchemaError::from(residual./*into_*/err().unwrap()))
     }
 }

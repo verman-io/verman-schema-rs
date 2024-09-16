@@ -1,20 +1,18 @@
-use crate::errors::VermanError;
-use crate::models::CommonContent;
 use std::ops::Deref;
 
-use either::Either;
+use crate::errors::VermanSchemaError;
+use crate::models::CommonContent;
 
-
-pub fn echo(common_content: &CommonContent) -> Result<CommonContent, VermanError> {
+pub fn echo(common_content: &CommonContent) -> Result<CommonContent, VermanSchemaError> {
     let content = common_content.content.to_owned();
     let env: indexmap::IndexMap<String, either::Either<String, Vec<u8>>> = match common_content.env
     {
         Some(ref _env) => _env.to_owned(),
         None => indexmap::IndexMap::<String, either::Either<String, Vec<u8>>>::new(),
     };
-    let handle_success = |input_vec: Vec<u8>| -> Result<CommonContent, VermanError> {
+    let handle_success = |input_vec: Vec<u8>| -> Result<CommonContent, VermanSchemaError> {
         if input_vec.is_empty() {
-            return Err(VermanError::NotFound("input to provide"));
+            return Err(VermanSchemaError::NotFound("input to provide"));
         }
         let variables = {
             let mut hm = std::collections::HashMap::<String, String>::with_capacity(env.len());
@@ -36,10 +34,10 @@ pub fn echo(common_content: &CommonContent) -> Result<CommonContent, VermanError
     match content {
         None => match env.get("PREVIOUS_TASK_CONTENT") {
             Some(previous_task_output) => handle_success(match previous_task_output {
-                Either::Left(s) => s.to_owned().into_bytes(),
-                Either::Right(v) => v.to_owned(),
+                either::Either::Left(s) => s.to_owned().into_bytes(),
+                either::Either::Right(v) => v.to_owned(),
             }),
-            None => Err(VermanError::NotFound("input to provide")),
+            None => Err(VermanSchemaError::NotFound("input to provide")),
         },
         Some(input) => {
             let input_vec = {
@@ -47,8 +45,8 @@ pub fn echo(common_content: &CommonContent) -> Result<CommonContent, VermanError
                 if input_v.len() == 1 && input_v.first() == Some("-".as_bytes().first().unwrap()) {
                     if let Some(previous_task_output) = env.get("PREVIOUS_TASK_CONTENT") {
                         input_v = match previous_task_output {
-                            Either::Left(s) => s.to_owned().into_bytes(),
-                            Either::Right(v) => v.to_owned(),
+                            either::Either::Left(s) => s.to_owned().into_bytes(),
+                            either::Either::Right(v) => v.to_owned(),
                         };
                     }
                 }
