@@ -18,12 +18,12 @@ std::collections::HashSet::<&'static str>::from(VALID_COMMANDS);*/
 #[derive(
     Debug,
     Clone,
-    strum_macros::EnumString,
-    strum_macros::VariantNames,
+    /* strum_macros::EnumString,
+    strum_macros::VariantNames, */
     serde_derive::Deserialize,
     serde_derive::Serialize,
 )]
-#[strum(serialize_all = "snake_case")]
+// #[strum(serialize_all = "snake_case")]
 pub enum CommandName {
     Echo,
     HttpClient,

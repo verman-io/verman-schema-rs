@@ -5,6 +5,7 @@ edition = "2021"
 license = "Apache-2.0 OR MIT"
 
 [dependencies]
+derive_more = { version = "1.0.0", features = ["display", "error", "from", "from_str"] }
 either = { version = "^1.13", features = ["serde"] }
 hifijson = "0.2.0"
 http = "^1"
@@ -20,8 +21,6 @@ serde = { version = "^1", features = ["serde_derive"] }
 serde-json-extensions = { git = "https://github.com/SamuelMarks/serde-json-extensions", version = "0.0.1" }
 serde_derive = "^1"
 serde_json = { version = "^1", features = ["indexmap", "preserve_order"] }
-strum = { version = "^0.26", features = ["derive"] }
-strum_macros = "^0.26"
 subst = { version = "^0.3", features = ["preserve-order"] }
 tokio = { version = "^1.40", features = ["macros"] }
 toml = { version = "^0.8", features = ["indexmap", "preserve_order"] }

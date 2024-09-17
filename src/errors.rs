@@ -1,164 +1,95 @@
-use std::cmp::PartialEq;
 use std::string::ToString;
 
-#[derive(
-    strum::AsRefStr, strum::Display, strum::EnumDiscriminants, strum::IntoStaticStr, Debug,
-)]
+#[derive(derive_more::Display, derive_more::Error, derive_more::From, Debug)]
 #[repr(u16)]
 pub enum VermanSchemaError {
-    #[strum(to_string = "NotFound({0:#?})")]
+    #[error(ignore)]
+    #[from(skip)]
+    #[display("NotFound({_0:#?})")]
     NotFound(&'static str) = 404,
 
-    #[strum(to_string = "{0:?}")]
+    #[error(ignore)]
+    #[from(skip)]
+    #[display("{_0:?}")]
     Task(String) = 594,
 
-    #[strum(to_string = "{0:?}")]
+    #[error(ignore)]
+    #[from(skip)]
+    #[display("{_0:?}")]
     TaskFailedToStart(String) = 597,
 
-    #[strum(to_string = "{0:?}")]
+    #[error(ignore)]
+    #[display("{_0:?}")]
     HttpError(u16) = 598,
 
-    #[strum(to_string = "{0:?}")]
+    #[error(ignore)]
+    #[from(skip)]
+    #[display("{_0:?}")]
     NotInstalled(String) = 599,
 
     // ************************
     // * Library level errors *
     // ************************
-    #[strum(to_string = "`std::io::Error` error. {error:?}")]
+    #[display("`std::io::Error` error. {error:?}")]
     StdIoError { error: std::io::Error } = 700,
 
-    #[strum(to_string = "{0:?}")]
+    #[error(ignore)]
+    #[display("{_0:?}")]
     ExitCode(std::process::ExitCode) = 710,
 
-    #[strum(to_string = "`toml::de::Error` error. {error:?}")]
+    #[display("`toml::de::Error` error. {error:?}")]
     TomlDeError { error: toml::de::Error } = 720,
 
-    #[strum(to_string = "`serde_json::Error` error. {error:?}")]
+    #[display("`serde_json::Error` error. {error:?}")]
     SerdeJsonError { error: serde_json::Error } = 721,
 
-    #[strum(to_string = "`reqwest::Error` error. {error:?}")]
+    #[display("`reqwest::Error` error. {error:?}")]
     ReqwestError { error: reqwest::Error } = 732,
 
-    #[strum(to_string = "`http::header::InvalidHeaderName` error. {error:?}")]
+    #[display("`http::header::InvalidHeaderName` error. {error:?}")]
     InvalidHeaderName {
         error: http::header::InvalidHeaderName,
     } = 733,
 
-    #[strum(to_string = "`http::header::InvalidHeaderValue` error. {error:?}")]
+    #[display("`http::header::InvalidHeaderValue` error. {error:?}")]
     InvalidHeaderValue {
         error: http::header::InvalidHeaderValue,
     } = 734,
 
-    #[strum(to_string = "`http::method::InvalidMethod` error. {error:?}")]
+    #[display("`http::method::InvalidMethod` error. {error:?}")]
     InvalidMethod { error: http::method::InvalidMethod } = 735,
 
-    #[strum(to_string = "`http::uri::InvalidUri` error. {error:?}")]
+    #[display("`http::uri::InvalidUri` error. {error:?}")]
     InvalidUri { error: http::uri::InvalidUri } = 736,
 
-    #[strum(to_string = "`serde_json_extensions::error::Error` error. {error:?}")]
+    #[display("`serde_json_extensions::error::Error` error. {error:?}")]
     SerdeJsonExtensionsError {
         error: serde_json_extensions::error::Error,
     } = 737,
 
-    #[strum(to_string = "`subst::Error` error. {error:?}")]
+    #[display("`subst::Error` error. {error:?}")]
     SubstError { error: subst::Error } = 738,
 
-    #[strum(to_string = "`std::str::Utf8Error` error. {error:?}")]
+    #[display("`std::str::Utf8Error` error. {error:?}")]
     Utf8Error { error: std::str::Utf8Error } = 739,
 
-    #[strum(to_string = "`jaq_core::compile::Errors` error. {error:?}")]
+    #[display("`jaq_core::compile::Errors` error. {error:?}")]
     JaqCoreError {
         error: jaq_core::compile::Errors<String>,
     } = 740,
 
-    #[strum(to_string = "`jaq_json::Error` error. {error:?}")]
+    #[display("`jaq_json::Error` error. {error:?}")]
     JaqJsonError { error: jaq_json::Error } = 741,
 
-    #[strum(to_string = "`jaq` str error. {0}")]
+    #[error(ignore)]
+    #[from(skip)]
+    #[display("`jaq` str error. {_0}")]
     JaqStrError(String) = 742,
 }
 
 impl VermanSchemaError {
     fn discriminant(&self) -> u16 {
         unsafe { *<*const _>::from(self).cast::<u16>() }
-    }
-}
-
-impl From<std::io::Error> for VermanSchemaError {
-    fn from(error: std::io::Error) -> Self {
-        Self::StdIoError { error }
-    }
-}
-
-impl From<toml::de::Error> for VermanSchemaError {
-    fn from(error: toml::de::Error) -> Self {
-        Self::TomlDeError { error }
-    }
-}
-
-impl From<std::process::ExitCode> for VermanSchemaError {
-    fn from(error: std::process::ExitCode) -> Self {
-        Self::ExitCode(error)
-    }
-}
-
-impl From<std::str::Utf8Error> for VermanSchemaError {
-    fn from(error: std::str::Utf8Error) -> Self {
-        Self::Utf8Error { error }
-    }
-}
-
-impl From<serde_json::error::Error> for VermanSchemaError {
-    fn from(error: serde_json::error::Error) -> Self {
-        Self::SerdeJsonError { error }
-    }
-}
-
-impl From<reqwest::Error> for VermanSchemaError {
-    fn from(error: reqwest::Error) -> Self {
-        Self::ReqwestError { error }
-    }
-}
-
-impl From<http::header::InvalidHeaderName> for VermanSchemaError {
-    fn from(error: http::header::InvalidHeaderName) -> Self {
-        Self::InvalidHeaderName { error }
-    }
-}
-
-impl From<http::header::InvalidHeaderValue> for VermanSchemaError {
-    fn from(error: http::header::InvalidHeaderValue) -> Self {
-        Self::InvalidHeaderValue { error }
-    }
-}
-
-impl From<http::method::InvalidMethod> for VermanSchemaError {
-    fn from(error: http::method::InvalidMethod) -> Self {
-        Self::InvalidMethod { error }
-    }
-}
-
-impl From<http::uri::InvalidUri> for VermanSchemaError {
-    fn from(error: http::uri::InvalidUri) -> Self {
-        Self::InvalidUri { error }
-    }
-}
-
-impl From<serde_json_extensions::error::Error> for VermanSchemaError {
-    fn from(error: serde_json_extensions::error::Error) -> Self {
-        Self::SerdeJsonExtensionsError { error }
-    }
-}
-
-impl From<subst::Error> for VermanSchemaError {
-    fn from(error: subst::Error) -> Self {
-        Self::SubstError { error }
-    }
-}
-
-impl From<jaq_json::Error> for VermanSchemaError {
-    fn from(error: jaq_json::Error) -> Self {
-        Self::JaqJsonError { error }
     }
 }
 
