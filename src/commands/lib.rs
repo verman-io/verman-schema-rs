@@ -16,7 +16,7 @@ pub mod set_env;
 std::collections::HashSet::<&'static str>::from(VALID_COMMANDS);*/
 
 #[derive(Debug, Clone, serde_derive::Deserialize, serde_derive::Serialize)]
-#[serde(untagged)]
+#[serde(tag = "cmd")]
 pub enum CommandArgs {
     Echo(CommonContent),
     HttpClient(HttpCommandArgs),
