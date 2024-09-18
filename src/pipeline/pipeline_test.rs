@@ -1,5 +1,5 @@
-use crate::commands::{CommandArgs, CommandName};
-use crate::models::{Command, CommonContent, HttpArgs, HttpCommandArgs, Pipeline, Task};
+use crate::commands::CommandArgs;
+use crate::models::{CommonContent, HttpArgs, HttpCommandArgs, Pipeline, Task};
 use crate::test_models::{HttpBinPostResponse, Message, HTTPBIN_URL};
 
 lazy_static::lazy_static! {
@@ -72,13 +72,11 @@ async fn one_empty_echo_task_one_command_pipeline_test() {
         env: None,
         pipe: vec![],
         tasks: Some(indexmap::indexmap! { String::from("task0") => Task {
-            commands: vec![Command {
-                cmd: CommandName::Echo,
-                args: Some(CommandArgs::Echo(CommonContent {
+            commands: vec![CommandArgs::Echo(CommonContent {
                     content: None,
                     env: None,
-                })),
-            }],
+                }),
+            ],
             input_schema: None,
             output_schema: None,
             env: None,
@@ -102,15 +100,12 @@ async fn one_echo_task_pipeline_test() {
         tasks: Some(indexmap::indexmap! {
         String::from("task0") =>
         Task {
-            commands: vec![Command {
-                cmd: CommandName::Echo,
-                args: Some(CommandArgs::Echo(CommonContent {
+            commands: vec![CommandArgs::Echo(CommonContent {
                     content: Some(Vec::from(b"FOO is set to ${FOO}")),
                     env: Some(indexmap::indexmap! {
                         String::from("FOO") => either::Left(String::from("bar"))
                     }),
-                })),
-            }],
+                })],
             input_schema: None,
             output_schema: None,
             env: None,
@@ -146,9 +141,7 @@ async fn one_http_task_pipeline_test() {
         tasks: Some(indexmap::indexmap! {
         String::from("task0") =>
         Task {
-            commands: vec![Command {
-                cmd: CommandName::HttpClient,
-                args: Some(CommandArgs::HttpClient(HttpCommandArgs {
+            commands: vec![CommandArgs::HttpClient(HttpCommandArgs {
                     args: HttpArgs {
                         url: format!("{}/post", HTTPBIN_URL)
                             .parse::<http::uri::Uri>()
@@ -165,8 +158,7 @@ async fn one_http_task_pipeline_test() {
                         env: None,
                     },
                     expectation: Default::default(),
-                })),
-            }],
+                })],
             input_schema: None,
             output_schema: None,
             env: None,
@@ -225,18 +217,13 @@ async fn one_echo_one_http_command_in_one_task_pipeline_test() {
         String::from("task0") =>
         Task {
             commands: vec![
-                Command {
-                    cmd: CommandName::Echo,
-                    args: Some(CommandArgs::Echo(CommonContent {
+                CommandArgs::Echo(CommonContent {
                         content: Some(serde_json::to_vec(&message_input).unwrap()),
                         env: Some(indexmap::indexmap! {
                             String::from("ME") => either::Left(String::from("Omega"))
                         }),
-                    })),
-                },
-                Command {
-                    cmd: CommandName::HttpClient,
-                    args: Some(CommandArgs::HttpClient(HttpCommandArgs {
+                    }),
+                CommandArgs::HttpClient(HttpCommandArgs {
                         args: HttpArgs {
                             url: format!("{}/post", HTTPBIN_URL)
                                 .parse::<http::uri::Uri>()
@@ -252,8 +239,7 @@ async fn one_echo_one_http_command_in_one_task_pipeline_test() {
                             env: None,
                         },
                         expectation: Default::default(),
-                    })),
-                },
+                    }),
             ],
             input_schema: None,
             output_schema: None,
@@ -317,25 +303,17 @@ async fn one_set_env_one_echo_one_http_command_one_jaq_in_one_task_pipeline_test
         tasks: Some(indexmap::indexmap! {
         String::from("task0") => Task {
             commands: vec![
-                Command {
-                    cmd: CommandName::SetEnv,
-                    args: Some(CommandArgs::SetEnv(CommonContent {
+                CommandArgs::SetEnv(CommonContent {
                         content: None,
                         env: Some(indexmap::indexmap! {
                             String::from("ME") => either::Left(String::from("Omega"))
                         })
-                    }))
-                },
-                Command {
-                    cmd: CommandName::Echo,
-                    args: Some(CommandArgs::Echo(CommonContent {
+                    }),
+                CommandArgs::Echo(CommonContent {
                         content: Some(serde_json::to_vec(&message_input).unwrap()),
                         env: None,
-                    })),
-                },
-                Command {
-                    cmd: CommandName::HttpClient,
-                    args: Some(CommandArgs::HttpClient(HttpCommandArgs {
+                    }),
+                CommandArgs::HttpClient(HttpCommandArgs {
                         args: HttpArgs {
                             url: format!("{}/post", HTTPBIN_URL)
                                 .parse::<http::uri::Uri>()
@@ -351,15 +329,11 @@ async fn one_set_env_one_echo_one_http_command_one_jaq_in_one_task_pipeline_test
                             env: None,
                         },
                         expectation: Default::default(),
-                    })),
-                },
-                    Command {
-                    cmd: CommandName::Jaq,
-                    args: Some(CommandArgs::Jaq(CommonContent {
+                    }),
+                    CommandArgs::Jaq(CommonContent {
                         content: Some(b".json.message".to_vec()),
                         env: None,
-                    })),
-                },
+                    })
             ],
             input_schema: None,
             output_schema: None,

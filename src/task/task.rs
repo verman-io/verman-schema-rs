@@ -1,4 +1,4 @@
-use crate::commands::{CommandArgs, CommandName};
+use crate::commands::CommandArgs;
 use crate::errors::VermanSchemaError;
 use crate::models::{CommonContent, Task};
 
@@ -71,64 +71,27 @@ impl Task {
             /* if !CommandName::VARIANTS.contains(command.cmd) {
                 return Err(VermanSchemaError::NotInstalled(command.cmd.to_owned()))
             } */
-            last_result = match command.cmd {
-                CommandName::Echo => match command.args {
-                    Some(CommandArgs::Echo(ref arg)) => {
-                        let mut common_with_merged_env = arg.to_owned();
-                        common_with_merged_env.env = match common_with_merged_env.env {
-                            None => Some(shared_env_for_cmds.clone()),
-                            Some(mut existing_env) => {
-                                existing_env.extend(
-                                    shared_env_for_cmds
-                                        .iter()
-                                        .map(|(k, v)| (k.to_owned(), v.to_owned())),
-                                );
-                                Some(existing_env)
-                            }
-                        };
-
-                        Ok(crate::commands::echo::echo(&common_with_merged_env)?)
-                    }
-                    _ => {
-                        log::warn!("No echo argument provided");
-                        Ok(CommonContent::default())
-                    }
-                },
-                CommandName::HttpClient => match command.args {
-                    Some(CommandArgs::HttpClient(ref arg)) => {
-                        let mut common_with_merged_env = arg.to_owned();
-                        common_with_merged_env.common_content.env =
-                            match common_with_merged_env.common_content.env {
-                                None => Some(shared_env_for_cmds.clone()),
-                                Some(mut existing_env) => {
-                                    existing_env.extend(
-                                        shared_env_for_cmds
-                                            .iter()
-                                            .map(|(k, v)| (k.to_owned(), v.to_owned())),
-                                    );
-                                    Some(existing_env)
-                                }
-                            };
-                        let (_, common) =
-                            crate::commands::http_client::http(&common_with_merged_env).await?;
-                        Ok(common)
-                    }
-                    _ => {
-                        macro_rules! no_http_arg_error {
-                            () => {
-                                "No http argument provided"
-                            };
+            last_result = match command {
+                CommandArgs::Echo(ref arg) => {
+                    let mut common_with_merged_env = arg.to_owned();
+                    common_with_merged_env.env = match common_with_merged_env.env {
+                        None => Some(shared_env_for_cmds.clone()),
+                        Some(mut existing_env) => {
+                            existing_env.extend(
+                                shared_env_for_cmds
+                                    .iter()
+                                    .map(|(k, v)| (k.to_owned(), v.to_owned())),
+                            );
+                            Some(existing_env)
                         }
-                        log::warn!(no_http_arg_error!());
-                        return Err(VermanSchemaError::TaskFailedToStart(String::from(
-                            no_http_arg_error!(),
-                        ))); // fail early on a http error
-                    }
-                },
-                CommandName::SetEnv => match command.args {
-                    Some(CommandArgs::SetEnv(ref arg)) => {
-                        let mut common_with_merged_env = arg.to_owned();
-                        common_with_merged_env.env = match common_with_merged_env.env {
+                    };
+
+                    Ok(crate::commands::echo::echo(&common_with_merged_env)?)
+                }
+                CommandArgs::HttpClient(ref arg) => {
+                    let mut common_with_merged_env = arg.to_owned();
+                    common_with_merged_env.common_content.env =
+                        match common_with_merged_env.common_content.env {
                             None => Some(shared_env_for_cmds.clone()),
                             Some(mut existing_env) => {
                                 existing_env.extend(
@@ -139,32 +102,42 @@ impl Task {
                                 Some(existing_env)
                             }
                         };
+                    let (_, common) =
+                        crate::commands::http_client::http(&common_with_merged_env).await?;
+                    Ok(common)
+                }
+                CommandArgs::SetEnv(ref arg) => {
+                    let mut common_with_merged_env = arg.to_owned();
+                    common_with_merged_env.env = match common_with_merged_env.env {
+                        None => Some(shared_env_for_cmds.clone()),
+                        Some(mut existing_env) => {
+                            existing_env.extend(
+                                shared_env_for_cmds
+                                    .iter()
+                                    .map(|(k, v)| (k.to_owned(), v.to_owned())),
+                            );
+                            Some(existing_env)
+                        }
+                    };
 
-                        Ok(crate::commands::set_env::set_env(&common_with_merged_env)?)
-                    }
-                    _ => Err(VermanSchemaError::TaskFailedToStart(String::from(
-                        "set_env",
-                    ))),
-                },
-                CommandName::Jaq => match command.args {
-                    Some(CommandArgs::Jaq(ref arg)) => {
-                        let mut common_with_merged_env = arg.to_owned();
-                        common_with_merged_env.env = match common_with_merged_env.env {
-                            None => Some(shared_env_for_cmds.clone()),
-                            Some(mut existing_env) => {
-                                existing_env.extend(
-                                    shared_env_for_cmds
-                                        .iter()
-                                        .map(|(k, v)| (k.to_owned(), v.to_owned())),
-                                );
-                                Some(existing_env)
-                            }
-                        };
+                    Ok(crate::commands::set_env::set_env(&common_with_merged_env)?)
+                }
+                CommandArgs::Jaq(ref arg) => {
+                    let mut common_with_merged_env = arg.to_owned();
+                    common_with_merged_env.env = match common_with_merged_env.env {
+                        None => Some(shared_env_for_cmds.clone()),
+                        Some(mut existing_env) => {
+                            existing_env.extend(
+                                shared_env_for_cmds
+                                    .iter()
+                                    .map(|(k, v)| (k.to_owned(), v.to_owned())),
+                            );
+                            Some(existing_env)
+                        }
+                    };
 
-                        Ok(crate::commands::jaq::jaq(&common_with_merged_env)?)
-                    }
-                    _ => Err(VermanSchemaError::TaskFailedToStart(String::from("jaq"))),
-                },
+                    Ok(crate::commands::jaq::jaq(&common_with_merged_env)?)
+                }
             }; /* fail at first failing task, without retries or force continuing */
             if let Ok(common) = last_result {
                 if let Some(env_for_merge) = common.env.clone() {

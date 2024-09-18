@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use crate::commands::{CommandArgs, CommandName};
+use crate::commands::CommandArgs;
 
 #[derive(Debug, serde_derive::Deserialize, serde_derive::Serialize)]
 #[serde(deny_unknown_fields)]
@@ -42,7 +42,7 @@ pub struct Stage {
 #[derive(Debug, serde_derive::Deserialize, serde_derive::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Task {
-    pub commands: Vec<Command>,
+    pub commands: Vec<CommandArgs>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_schema: Option<JsonSchema>,
@@ -73,17 +73,6 @@ impl Task {
             },
         }
     }
-}
-
-#[derive(Debug, Clone, serde_derive::Deserialize, serde_derive::Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct Command {
-    /// Command to execute (e.g., "http_client")
-    pub cmd: CommandName,
-
-    /// Optional arguments for the command
-    #[serde(skip_serializing_if = "Option::is_none", flatten)]
-    pub args: Option<CommandArgs>,
 }
 
 #[derive(Debug, Clone, serde_derive::Deserialize, serde_derive::Serialize)]

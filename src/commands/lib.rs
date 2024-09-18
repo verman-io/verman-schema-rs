@@ -15,22 +15,6 @@ pub mod set_env;
 /*pub const VALID_COMMANDS_SET: std::collections::HashSet<&'static str> =
 std::collections::HashSet::<&'static str>::from(VALID_COMMANDS);*/
 
-#[derive(
-    Debug,
-    Clone,
-    /* strum_macros::EnumString,
-    strum_macros::VariantNames, */
-    serde_derive::Deserialize,
-    serde_derive::Serialize,
-)]
-// #[strum(serialize_all = "snake_case")]
-pub enum CommandName {
-    Echo,
-    HttpClient,
-    SetEnv,
-    Jaq,
-}
-
 #[derive(Debug, Clone, serde_derive::Deserialize, serde_derive::Serialize)]
 #[serde(untagged)]
 pub enum CommandArgs {
