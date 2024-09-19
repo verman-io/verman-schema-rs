@@ -11,7 +11,7 @@ impl Default for Pipeline {
             url: String::new(),
             engine_version: String::from("0.1.0"),
             env: None,
-            pipe: vec![],
+            pipe: None,
             tasks: None,
             schemas: None,
         }

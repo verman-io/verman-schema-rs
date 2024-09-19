@@ -1,10 +1,9 @@
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::str::FromStr;
 
 use crate::commands::CommandArgs;
 
-#[derive(Debug, serde_derive::Deserialize, serde_derive::Serialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Pipeline {
     pub name: String,
@@ -14,11 +13,17 @@ pub struct Pipeline {
     pub engine_version: String,
 
     /// Optional environment variables
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "de_opt_indexmap_str_or_bytes",
+        serialize_with = "se_opt_indexmap_str_or_bytes"
+    )]
     pub env: Option<indexmap::IndexMap<String, either::Either<String, Vec<u8>>>>,
 
     /// List of pipeline stages
-    pub pipe: Vec<Stage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pipe: Option<Vec<Stage>>,
 
     /// Map of task names to their definitions ; expected to be used in jsonref context
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -26,7 +31,7 @@ pub struct Pipeline {
 
     /// Map of schema names to their definitions ; expected to be used in jsonref context
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub schemas: Option<HashMap<String, JsonSchema>>,
+    pub schemas: Option<std::collections::HashMap<String, JsonSchema>>,
 }
 
 #[derive(Debug, serde_derive::Deserialize, serde_derive::Serialize)]
@@ -50,7 +55,12 @@ pub struct Task {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_schema: Option<JsonSchema>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "de_opt_indexmap_str_or_bytes",
+        serialize_with = "se_opt_indexmap_str_or_bytes"
+    )]
     pub env: Option<indexmap::IndexMap<String, either::Either<String, Vec<u8>>>>,
 }
 
@@ -101,6 +111,7 @@ macro_rules! tri {
 pub struct CommonContent {
     /// If `-` provided (default) then stdin / output from previous task is read
     #[serde(
+        default,
         skip_serializing_if = "Option::is_none",
         deserialize_with = "de__utf8_else_vecu8",
         serialize_with = "se__utf8_else_vecu8"
@@ -108,6 +119,7 @@ pub struct CommonContent {
     pub content: Option<Vec<u8>>, /* Option<impl std::io::Read> */
 
     #[serde(
+        default,
         skip_serializing_if = "Option::is_none",
         deserialize_with = "de_opt_indexmap_str_or_bytes",
         serialize_with = "se_opt_indexmap_str_or_bytes"
@@ -123,17 +135,31 @@ where
     struct Utf8OrBytes;
 
     impl<'de> serde::de::Visitor<'de> for Utf8OrBytes {
-        type Value = Vec<u8>;
+        type Value = Option<Vec<u8>>;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a UTF-8 string or a sequence of bytes")
+            formatter.write_str("a UTF-8 string, a byte sequence, or null")
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(None)
+        }
+
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(None)
         }
 
         fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
         where
             E: serde::de::Error,
         {
-            Ok(value.as_bytes().to_vec())
+            Ok(Some(value.as_bytes().to_vec()))
         }
 
         fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -144,11 +170,11 @@ where
             while let Some(byte) = seq.next_element()? {
                 vec.push(byte);
             }
-            Ok(vec)
+            Ok(Some(vec))
         }
     }
 
-    Ok(Some(deserializer.deserialize_any(Utf8OrBytes)?))
+    deserializer.deserialize_any(Utf8OrBytes)
 }
 
 #[allow(non_snake_case)]
@@ -195,10 +221,7 @@ where
             let mut index_map = indexmap::IndexMap::new();
             while let Some((key, value)) = map.next_entry::<String, serde_json::Value>()? {
                 let either_value = match value {
-                    // If it's a string we treat it as Either::Left (String)
                     serde_json::Value::String(s) => either::Either::Left(s),
-
-                    // If it's an array of numbers, we process it as Either::Right (Vec<u8>)
                     serde_json::Value::Array(arr) => {
                         let bytes: Result<Vec<u8>, _> = arr
                             .into_iter()
@@ -213,7 +236,6 @@ where
                             .collect();
                         either::Either::Right(bytes?)
                     }
-
                     _ => {
                         return Err(serde::de::Error::custom(
                             "Invalid value type for IndexMap value",
@@ -226,7 +248,11 @@ where
         }
     }
 
-    deserializer.deserialize_option(VisitorOptionMap(MapVisitor))
+    Ok(Some(
+        deserializer
+            .deserialize_any(MapVisitor)
+            .or(Ok(indexmap::IndexMap::new()))?,
+    ))
 }
 
 pub struct VisitorOptionMap<T>(T);

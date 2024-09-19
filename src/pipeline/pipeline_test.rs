@@ -9,7 +9,7 @@ lazy_static::lazy_static! {
         description: String::from(env!("CARGO_PKG_DESCRIPTION")),
         url: String::from(env!("CARGO_PKG_REPOSITORY")),
         env: None,
-        pipe: vec![],
+        pipe: None,
         tasks: None,
         schemas: None,
         ..Pipeline::default()
@@ -24,7 +24,7 @@ async fn empty_pipeline_test() {
         description: String::from(env!("CARGO_PKG_DESCRIPTION")),
         url: String::from(env!("CARGO_PKG_REPOSITORY")),
         env: None,
-        pipe: vec![],
+        pipe: None,
         tasks: None,
         schemas: None,
         ..Pipeline::default()
@@ -41,7 +41,7 @@ async fn empty_echo_task_empty_commands_pipeline_test() {
         description: String::from(env!("CARGO_PKG_DESCRIPTION")),
         url: String::from(env!("CARGO_PKG_REPOSITORY")),
         env: None,
-        pipe: vec![],
+        pipe: None,
         tasks: Some(indexmap::indexmap! {
         String::from("task0") =>
         Task {
@@ -70,7 +70,7 @@ async fn one_empty_echo_task_one_command_pipeline_test() {
         description: String::from(env!("CARGO_PKG_DESCRIPTION")),
         url: String::from(env!("CARGO_PKG_REPOSITORY")),
         env: None,
-        pipe: vec![],
+        pipe: None,
         tasks: Some(indexmap::indexmap! { String::from("task0") => Task {
             commands: vec![CommandArgs::Echo(CommonContent {
                     content: None,
@@ -96,7 +96,7 @@ async fn one_echo_task_pipeline_test() {
         description: String::from(env!("CARGO_PKG_DESCRIPTION")),
         url: String::from(env!("CARGO_PKG_REPOSITORY")),
         env: None,
-        pipe: vec![],
+        pipe: None,
         tasks: Some(indexmap::indexmap! {
         String::from("task0") =>
         Task {
@@ -137,7 +137,7 @@ async fn one_http_task_pipeline_test() {
         description: String::from(env!("CARGO_PKG_DESCRIPTION")),
         url: String::from(env!("CARGO_PKG_REPOSITORY")),
         env: None,
-        pipe: vec![],
+        pipe: None,
         tasks: Some(indexmap::indexmap! {
         String::from("task0") =>
         Task {
@@ -212,7 +212,7 @@ async fn one_echo_one_http_command_in_one_task_pipeline_test() {
         description: String::from(env!("CARGO_PKG_DESCRIPTION")),
         url: String::from(env!("CARGO_PKG_REPOSITORY")),
         env: None,
-        pipe: vec![],
+        pipe: None,
         tasks: Some(indexmap::indexmap! {
         String::from("task0") =>
         Task {
@@ -299,7 +299,7 @@ async fn one_set_env_one_echo_one_http_command_one_jaq_in_one_task_pipeline_test
         description: String::from(env!("CARGO_PKG_DESCRIPTION")),
         url: String::from(env!("CARGO_PKG_REPOSITORY")),
         env: None,
-        pipe: vec![],
+        pipe: None,
         tasks: Some(indexmap::indexmap! {
         String::from("task0") => Task {
             commands: vec![
