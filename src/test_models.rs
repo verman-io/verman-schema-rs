@@ -7,13 +7,13 @@ pub const HTTPBIN_URL: &'static str = match option_env!("HTTPBIN_URL") {
 
 #[derive(Default, Debug, Clone, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct HttpBinPostResponse {
+pub(crate) struct HttpBinPostResponse<JSON = serde_json::Value> {
     pub args: serde_json::Value,
     pub data: String,
     pub files: serde_json::Value,
     pub form: serde_json::Value,
     pub headers: HttpBinPostHeaders,
-    pub json: serde_json::Value,
+    pub json: JSON,
     pub origin: String,
     pub url: String,
 }

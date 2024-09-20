@@ -1,8 +1,13 @@
 use std::str::FromStr;
 
 use crate::errors::VermanSchemaError;
-use crate::models::{CommonContent, HttpCommandArgs};
+use crate::models::{CommonContent, HttpCommandArgs, Task};
 
+/// http command.
+/// Note that because `CommonContent.content` is `serde_json::Value`, for non JSON inputs or outputs,
+/// you'll want to create a new `http` command, possibly that accepts Vec<u8>.
+/// (which can be done by removing `.json(` below and using a `serde_json::Value` with
+/// `serde_json::Value::Array(Vec::<serde_json::Value::Number()>::new())`)
 pub async fn http(
     http_command_args: &HttpCommandArgs,
 ) -> Result<(Option<reqwest::Response>, CommonContent), VermanSchemaError> {
@@ -15,14 +20,14 @@ pub async fn http(
         .env
         .to_owned()
         .unwrap_or_else(|| indexmap::IndexMap::<String, serde_json::Value>::new());
-    body = body.or(env.get("PREVIOUS_TASK_CONTENT").cloned());
+    body = body.or_else(|| env.get("PREVIOUS_TASK_CONTENT").cloned());
 
     let mut args = http_command_args.args.to_owned();
     if !env.is_empty() {
         /* Do interpolation and ensure input is set */
         let mut hm = std::collections::HashMap::<String, String>::with_capacity(env.len());
-        for (k, either_v) in env.iter() {
-            match either_v {
+        for (k, val) in env.iter() {
+            match val {
                 serde_json::Value::String(s) => {
                     let _ = hm.insert(k.to_owned(), s.to_owned());
                 }
@@ -40,11 +45,19 @@ pub async fn http(
             subst::substitute(args.url.to_string().as_str(), &hm)?.as_str(),
         )?;
 
-        if let Some(serde_json::Value::String(bod)) = body {
-            body = Some(serde_json::Value::String(subst::substitute(
-                bod.as_str(),
-                &hm,
-            )?));
+        match body {
+            Some(serde_json::Value::String(bod)) => {
+                body = Some(serde_json::Value::String(subst::substitute(
+                    bod.as_str(),
+                    &hm,
+                )?));
+            }
+            Some(val) => {
+                body = Some(serde_json::from_str(
+                    subst::substitute(serde_json::to_string(&val)?.as_str(), &hm)?.as_str(),
+                )?);
+            }
+            _ => {}
         }
     }
     let client = reqwest::Client::new();
@@ -52,8 +65,8 @@ pub async fn http(
     if let Some(headers) = args.headers {
         req = req.headers(indexmap_of_ValueNoObj_to_HeaderMap(&headers)?);
     }
-    if let Some(serde_json::Value::String(bod)) = body {
-        req = req.body(bod);
+    if let Some(bod) = body {
+        req = req.json(&bod);
     }
     /*******************************
      * Execute then check response *
@@ -71,10 +84,18 @@ pub async fn http(
         Some("application/json") | Some("text/json") => Ok((
             None,
             CommonContent {
-                env: Some(indexmap::indexmap! {
-                    String::from("PREVIOUS_TASK_CONTENT") => serde_json::Value::String(res./*json()*/text().await?),
-                    String::from("PREVIOUS_TASK_TYPE") => serde_json::Value::String(String::from("JSON"))
-                }),
+                env: Some(indexmap::IndexMap::<String, serde_json::Value>::from([
+                    (
+                        String::from("PREVIOUS_TASK_CONTENT"),
+                        serde_json::from_str::<serde_json::Value>(
+                            res./*json()*/text().await?.as_str(),
+                        )?,
+                    ),
+                    (
+                        String::from("PREVIOUS_TASK_TYPE"),
+                        serde_json::Value::String(String::from("JSON")),
+                    ),
+                ])),
                 ..CommonContent::default()
             },
         )),
@@ -101,8 +122,8 @@ pub async fn http(
             None,
             CommonContent {
                 env: Some(indexmap::indexmap! {
-                    String::from("PREVIOUS_TASK_CONTENT") => Ok(serde_json::from_slice(res.bytes().await?.deref())?),
-                    String::from("PREVIOUS_TASK_TYPE") => Ok(serde_json::Value::String(String::from(content_type.unwrap())))
+                    String::from("PREVIOUS_TASK_CONTENT") => serde_json::from_slice(res.bytes().await?.iter().as_slice())?,
+                    String::from("PREVIOUS_TASK_TYPE") => serde_json::Value::String(String::from(content_type.unwrap()))
                 }),
                 ..CommonContent::default()
             },

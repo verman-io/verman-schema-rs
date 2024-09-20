@@ -1,14 +1,12 @@
 use std::io::Write;
 
-use lazy_static::lazy_static;
-
 use super::*;
 use crate::models::CommonContent;
 
 const MOCK_FILTERS: [(&'static str, &'static str); 3] =
     [(".[0]", "null"), (".[1]", "[true,null]"), (".[2]", "5")];
 
-lazy_static! {
+lazy_static::lazy_static! {
     static ref MOCK_DATA_SERDE_JSON: serde_json::Value =
         serde_json::json!("[null, [true, null], 5]");
 }
@@ -64,14 +62,14 @@ fn test_jaq_runner1() {
 #[test]
 fn test_jaq() {
     let input_common = CommonContent {
-        content: Some(b".[1]".to_vec()),
+        content: Some(serde_json::Value::String(String::from(".[1]"))),
         env: Some(indexmap::indexmap! {
-            String::from("PREVIOUS_TASK_CONTENT") => serde_json::Value::String(String::from("[1,{\"stuff\": true}]"))
+            String::from("PREVIOUS_TASK_CONTENT") => serde_json::json!([1,{"stuff": true}])
         }),
     };
     let result_common = jaq(&input_common).unwrap();
     assert_eq!(
-        std::str::from_utf8(&result_common.content.unwrap()).unwrap(),
-        String::from("{\"stuff\":true}")
+        result_common.content.unwrap(),
+        serde_json::Value::String(String::from("{\"stuff\":true}"))
     );
 }

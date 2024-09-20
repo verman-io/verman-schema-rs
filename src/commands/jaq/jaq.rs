@@ -1,7 +1,7 @@
-use std::io::Write;
-
 use crate::errors::VermanSchemaError;
 use crate::models::CommonContent;
+use std::io::Write;
+use std::str::Utf8Error;
 
 mod jaq_utils;
 
@@ -12,21 +12,20 @@ pub fn jaq(common_content: &CommonContent) -> Result<CommonContent, VermanSchema
     let input = Box::new(std::iter::once(Ok(match env {
         None => Err(VermanSchemaError::NotFound("Any content")),
         Some(envi) => {
-            let json: serde_json::Value = serde_json::from_str(
-                envi.get(&String::from("PREVIOUS_TASK_CONTENT"))
-                    .ok_or_else(|| VermanSchemaError::NotFound("Any content"))?
-                    .to_owned()
-                    .left()
-                    .unwrap()
-                    .as_str(),
-            )?;
+            let json: serde_json::Value = envi
+                .get(&String::from("PREVIOUS_TASK_CONTENT"))
+                .ok_or_else(|| VermanSchemaError::NotFound("Any content"))?
+                .to_owned();
             Ok(jaq_json::Val::from(json))
         }
     }?)));
     let content_vec = content.ok_or_else(|| VermanSchemaError::NotFound("Any filter"))?;
-    let filter = std::str::from_utf8(content_vec.as_slice())?;
+    let filter = match content_vec {
+        serde_json::Value::String(s) => Ok(s),
+        _ => Err(VermanSchemaError::NotFound("String filter")),
+    }?;
 
-    let (vars, filter) = jaq_utils::vars_filter_from_code(filter)?;
+    let (vars, filter) = jaq_utils::vars_filter_from_code(filter.as_str())?;
 
     let mut buf = Vec::<u8>::new();
     let _result: bool = jaq_runner(&filter, vars.clone(), false, input, |v| {
@@ -35,7 +34,10 @@ pub fn jaq(common_content: &CommonContent) -> Result<CommonContent, VermanSchema
     .ok_or_else(|| VermanSchemaError::JaqStrError(String::from("`jaq_runner` failed")))?;
     /*assert!(_result);*/
     Ok(CommonContent {
-        content: Some(buf),
+        content: Some(match std::str::from_utf8(buf.as_slice()) {
+            Ok(s) => serde_json::Value::String(s.to_string()),
+            Err(_) => buf.into(),
+        }),
         ..CommonContent::default()
     })
 }
@@ -60,7 +62,6 @@ fn jaq_runner(
 
     for item in if null_input { &null } else { &iter } {
         let input = item.map_err(std::io::Error::other)?;
-        //println!("Got {:?}", input);
         for output in filter.run((ctx.clone(), input)) {
             use jaq_core::ValT;
             let output = output.map_err(|e| {

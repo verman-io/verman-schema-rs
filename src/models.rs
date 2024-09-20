@@ -153,10 +153,27 @@ where
 
 #[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct HttpCommandArgs {
+pub struct HttpCommandArgs<T = serde_json::Value> {
     pub args: HttpArgs,
     pub common_content: CommonContent,
     pub expectation: Expectation,
+    #[serde(skip)]
+    pub deserialize_to: T,
+}
+
+impl HttpCommandArgs {
+    pub(crate) fn new(
+        args: HttpArgs,
+        common_content: CommonContent,
+        expectation: Expectation,
+    ) -> Self {
+        Self {
+            args,
+            common_content,
+            expectation,
+            deserialize_to: Default::default(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]

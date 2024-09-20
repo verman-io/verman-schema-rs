@@ -32,8 +32,6 @@ fn test_task_json_env_value() {
         })],
         ..Task::default()
     };
-    println!("{}", TASK1_S_RAW);
-    println!("{}", serde_json::to_string(&task1).unwrap());
     assert_eq!(serde_json::to_string(&task1).unwrap(), TASK1_S);
     assert_eq!(TASK1_S_RAW, TASK1_S);
     assert_eq!(serde_json::from_str::<Task>(TASK1_S).unwrap(), task1);

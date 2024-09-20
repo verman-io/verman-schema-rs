@@ -101,7 +101,7 @@ async fn one_echo_task_pipeline_test() {
         String::from("task0") =>
         Task {
             commands: vec![CommandArgs::Echo(CommonContent {
-                    content: Some(Vec::from(b"FOO is set to ${FOO}")),
+                    content: Some(serde_json::Value::String(String::from("FOO is set to ${FOO}"))),
                     env: Some(indexmap::indexmap! {
                         String::from("FOO") => serde_json::Value::String(String::from("bar"))
                     }),
@@ -141,8 +141,8 @@ async fn one_http_task_pipeline_test() {
         tasks: Some(indexmap::indexmap! {
         String::from("task0") =>
         Task {
-            commands: vec![CommandArgs::HttpClient(HttpCommandArgs {
-                    args: HttpArgs {
+            commands: vec![CommandArgs::HttpClient(HttpCommandArgs::new(
+                    HttpArgs {
                         url: format!("{}/post", HTTPBIN_URL)
                             .parse::<http::uri::Uri>()
                             .unwrap(),
@@ -151,14 +151,12 @@ async fn one_http_task_pipeline_test() {
                             String::from("Content-Type") => serde_json_extensions::ValueNoObjOrArr::String(String::from("application/json")),
                         }]),
                     },
-                    common_content: CommonContent {
-                        content: Some(
-                            serde_json::to_string(&message_input).unwrap().into_bytes(),
-                        ),
+                    CommonContent {
+                        content: Some(serde_json::to_value(&message_input).unwrap()),
                         env: None,
                     },
-                    expectation: Default::default(),
-                })],
+                    Default::default(),
+                ))],
             input_schema: None,
             output_schema: None,
             env: None,
@@ -178,23 +176,11 @@ async fn one_http_task_pipeline_test() {
         "JSON"
     );
     assert_eq!(
-        env.get("PREVIOUS_TASK_NAME")
-            .unwrap()
-            .to_owned()
-            .left()
-            .unwrap()
-            .as_str(),
+        env.get("PREVIOUS_TASK_NAME").unwrap().as_str().unwrap(),
         "task0"
     );
-    let http_bin_post_response: HttpBinPostResponse = serde_json::from_str(
-        env.get("PREVIOUS_TASK_CONTENT")
-            .unwrap()
-            .to_owned()
-            .left()
-            .unwrap()
-            .as_str(),
-    )
-    .unwrap();
+    let http_bin_post_response: HttpBinPostResponse =
+        serde_json::from_value(env.get("PREVIOUS_TASK_CONTENT").unwrap().to_owned()).unwrap();
     let message_response: Message =
         serde_json::from_str(http_bin_post_response.data.as_str()).unwrap();
     assert_eq!(message_response, message_input);
@@ -217,13 +203,13 @@ async fn one_echo_one_http_command_in_one_task_pipeline_test() {
         Task {
             commands: vec![
                 CommandArgs::Echo(CommonContent {
-                        content: Some(serde_json::to_vec(&message_input).unwrap()),
+                        content: Some(serde_json::to_value(&message_input).unwrap()),
                         env: Some(indexmap::indexmap! {
                             String::from("ME") => serde_json::Value::String(String::from("Omega"))
                         }),
                     }),
-                CommandArgs::HttpClient(HttpCommandArgs {
-                        args: HttpArgs {
+                CommandArgs::HttpClient(HttpCommandArgs::new(
+                        HttpArgs {
                             url: format!("{}/post", HTTPBIN_URL)
                                 .parse::<http::uri::Uri>()
                                 .unwrap(),
@@ -232,13 +218,13 @@ async fn one_echo_one_http_command_in_one_task_pipeline_test() {
                                 String::from("Content-Type") => serde_json_extensions::ValueNoObjOrArr::String(String::from("application/json")),
                             }]),
                         },
-                        common_content: CommonContent {
+                        CommonContent {
                             content: None,
                             /* defaults to "-", i.e., the result of the previous task */
                             env: None,
                         },
-                        expectation: Default::default(),
-                    }),
+                        Default::default(),
+                    )),
             ],
             input_schema: None,
             output_schema: None,
@@ -248,32 +234,24 @@ async fn one_echo_one_http_command_in_one_task_pipeline_test() {
         schemas: None,
         ..Pipeline::default()
     };
-    /* println!("{}", serde_json::to_string(&pipeline5).unwrap());
+    /*
+    println!("{}", serde_json::to_string_pretty(&pipeline5).unwrap());
     println!("{}", toml::to_string(&pipeline5).unwrap()); */
     let common = pipeline5.process().await.unwrap();
     let env = common.env.unwrap();
     assert_eq!(
-        env.get("PREVIOUS_TASK_TYPE")
-            .unwrap()
-            .to_owned()
-            .left()
-            .unwrap(),
+        env.get("PREVIOUS_TASK_TYPE").unwrap().as_str().unwrap(),
         String::from("JSON")
     );
     assert_eq!(
-        env.get("PREVIOUS_TASK_NAME")
-            .unwrap()
-            .to_owned()
-            .left()
-            .unwrap(),
+        env.get("PREVIOUS_TASK_NAME").unwrap().as_str().unwrap(),
         String::from("task0")
     );
-    let s = env.get("PREVIOUS_TASK_CONTENT").unwrap().unwrap().unwrap();
-    let http_bin_post_response: HttpBinPostResponse = serde_json::from_str(s).unwrap();
-    let message_response: Message =
-        serde_json::from_str(http_bin_post_response.data.as_str()).unwrap();
+    let previous_task_content = env.get("PREVIOUS_TASK_CONTENT").unwrap();
+    let httpbin_post_response: crate::test_models::HttpBinPostResponse<Message> =
+        serde_json::from_value(previous_task_content.to_owned()).unwrap();
     assert_eq!(
-        message_response,
+        httpbin_post_response.json,
         Message {
             message: String::from("greetings to Omega"),
         }
@@ -302,11 +280,11 @@ async fn one_set_env_one_echo_one_http_command_one_jaq_in_one_task_pipeline_test
                         })
                     }),
                 CommandArgs::Echo(CommonContent {
-                        content: Some(serde_json::to_vec(&message_input).unwrap()),
+                        content: Some(serde_json::to_value(&message_input).unwrap()),
                         env: None,
                     }),
-                CommandArgs::HttpClient(HttpCommandArgs {
-                        args: HttpArgs {
+                CommandArgs::HttpClient(HttpCommandArgs::new(
+                        HttpArgs {
                             url: format!("{}/post", HTTPBIN_URL)
                                 .parse::<http::uri::Uri>()
                                 .unwrap(),
@@ -315,15 +293,15 @@ async fn one_set_env_one_echo_one_http_command_one_jaq_in_one_task_pipeline_test
                                 String::from("Content-Type") => serde_json_extensions::ValueNoObjOrArr::String(String::from("application/json")),
                             }]),
                         },
-                        common_content: CommonContent {
+                        CommonContent {
                             content: None,
                             /* defaults to "-", i.e., the result of the previous task */
                             env: None,
                         },
-                        expectation: Default::default(),
-                    }),
+                        Default::default(),
+                    )),
                     CommandArgs::Jaq(CommonContent {
-                        content: Some(b".json.message".to_vec()),
+                        content: Some(serde_json::Value::String(String::from(".json.message"))),
                         env: None,
                     })
             ],

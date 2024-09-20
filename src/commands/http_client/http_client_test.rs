@@ -4,36 +4,32 @@ use crate::test_models::{Message, HTTPBIN_URL};
 
 #[tokio::test]
 async fn test_httpbin_post_empty_body() {
-    let result = http(&HttpCommandArgs {
-        args: HttpArgs {
+    let result = http(&HttpCommandArgs::new(
+        HttpArgs {
             url: format!("{}/post", HTTPBIN_URL)
                 .parse::<http::uri::Uri>()
                 .unwrap(),
             method: http::method::Method::POST,
             headers: None,
         },
-        common_content: CommonContent::default(),
-        expectation: Expectation::default(),
-    })
+        CommonContent::default(),
+        Expectation::default(),
+    ))
     .await
     .unwrap()
     .1
     .env
     .unwrap();
-    let out = result
-        .get("PREVIOUS_TASK_CONTENT")
-        .unwrap()
-        .as_str()
-        .unwrap();
+    let previous_task_content = result.get("PREVIOUS_TASK_CONTENT").unwrap();
     let httpbin_post_response: crate::test_models::HttpBinPostResponse =
-        serde_json::from_str(out).unwrap();
+        serde_json::from_value(previous_task_content.to_owned()).unwrap();
     assert_eq!(httpbin_post_response.json, serde_json::Value::Null);
 }
 
 #[tokio::test]
 async fn test_httpbin_post_message_body() {
-    let result = http(&HttpCommandArgs {
-        args: HttpArgs {
+    let result = http(&HttpCommandArgs::new(
+        HttpArgs {
             url: format!("{}/post", HTTPBIN_URL)
                 .parse::<http::uri::Uri>()
                 .unwrap(),
@@ -44,23 +40,21 @@ async fn test_httpbin_post_message_body() {
                     }
             ])
         },
-        common_content: CommonContent{
-            content: Some(serde_json::Value::String(String::from("{\"message\": \"greetings\"}"))),
-            // ^ could also construct `Message` and `serde_json` it down, like in next test
+        CommonContent{
+            content: Some(serde_json::json!({"message": "greetings"})),
             ..CommonContent::default()
         },
-        expectation: Expectation::default(),
-    })
+        Expectation::default(),
+    ))
         .await.unwrap().1.env.unwrap();
-    let out = result
-        .get("PREVIOUS_TASK_CONTENT")
-        .unwrap()
-        .as_str()
-        .unwrap();
-    let httpbin_post_response: crate::test_models::HttpBinPostResponse =
-        serde_json::from_str(out).unwrap();
-    let message: Message = serde_json::from_value(httpbin_post_response.json).unwrap();
-    assert_eq!(message.message, "greetings");
+    assert!(result.contains_key("PREVIOUS_TASK_CONTENT"));
+    let previous_task_content = result.get("PREVIOUS_TASK_CONTENT").unwrap();
+    let httpbin_post_response: crate::test_models::HttpBinPostResponse<Message> =
+        serde_json::from_value(previous_task_content.to_owned()).unwrap();
+    let message0: Message = serde_json::from_str(httpbin_post_response.data.as_str()).unwrap();
+    assert_eq!(message0.message, "greetings");
+    let message1: Message = httpbin_post_response.json;
+    assert_eq!(message1.message, "greetings");
 }
 
 #[tokio::test]
@@ -69,8 +63,8 @@ async fn test_httpbin_post_message_body_and_env_vars() {
         message: String::from("greetings to ${ME}"),
     };
 
-    let result = http(&HttpCommandArgs {
-        args: HttpArgs {
+    let result = http(&HttpCommandArgs::new(
+        HttpArgs {
             url: format!("{}/post", HTTPBIN_URL)
                 .parse::<http::uri::Uri>()
                 .unwrap(),
@@ -81,7 +75,7 @@ async fn test_httpbin_post_message_body_and_env_vars() {
                     }
             ])
         },
-        common_content: CommonContent {
+        CommonContent {
             content: Some(serde_json::to_value(&message_input).unwrap()),
             // ^ could also construct `Message` and `serde_json` it down
             env: Some(indexmap::indexmap! {
@@ -89,16 +83,13 @@ async fn test_httpbin_post_message_body_and_env_vars() {
                 }),
             ..CommonContent::default()
         },
-        expectation: Expectation::default(),
-    })
+        Expectation::default(),
+    ))
         .await.unwrap().1.env.unwrap();
-    let out = result
-        .get("PREVIOUS_TASK_CONTENT")
-        .unwrap()
-        .as_str()
-        .unwrap();
+
+    let previous_task_content = result.get("PREVIOUS_TASK_CONTENT").unwrap();
     let httpbin_post_response: crate::test_models::HttpBinPostResponse =
-        serde_json::from_str(out).unwrap();
+        serde_json::from_value(previous_task_content.to_owned()).unwrap();
     let message: Message = serde_json::from_value(httpbin_post_response.json).unwrap();
     assert_eq!(message.message, "greetings to Prine");
 }

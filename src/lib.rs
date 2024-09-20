@@ -1,5 +1,7 @@
-#![feature(try_trait_v2)]
 #![feature(iter_collect_into)]
+#![feature(pattern)]
+#![feature(try_trait_v2)]
+
 extern crate core;
 
 pub mod models;

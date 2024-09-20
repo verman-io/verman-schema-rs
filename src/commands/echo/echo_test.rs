@@ -21,5 +21,10 @@ fn echo_env_test() {
         }),
     })
     .unwrap();
-    assert_eq!(b.content, Some("Hello ${weird} var".as_bytes().to_vec()));
+    assert_eq!(
+        b.content,
+        Some(serde_json::Value::String(String::from(
+            "Hello ${weird} var"
+        )))
+    );
 }
