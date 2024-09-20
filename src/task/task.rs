@@ -6,8 +6,7 @@ pub async fn process_tasks_serially(
     pipeline_name: &String,
     tasks: &indexmap::IndexMap<String, Task>,
 ) -> Result<CommonContent, VermanSchemaError> {
-    let mut shared_env_for_tasks =
-        indexmap::IndexMap::<String, either::Either<String, Vec<u8>>>::new();
+    let mut shared_env_for_tasks = indexmap::IndexMap::<String, serde_json::Value>::new();
 
     for (task_name, task) in tasks.iter() {
         log::info!("Executing task {:#?}", task_name);
@@ -16,10 +15,7 @@ pub async fn process_tasks_serially(
                 "CURRENT_TASK_NAME"
             };
         }
-        shared_env_for_tasks.insert(
-            String::from(task_name_key!()),
-            either::Either::Left(task_name.to_string()),
-        );
+        shared_env_for_tasks.insert(String::from(task_name_key!()), task_name.to_string().into());
         let common = Task::from_task_merge_env(task, &shared_env_for_tasks)
             .process(pipeline_name, task_name)
             .await?;
@@ -36,19 +32,15 @@ pub async fn process_tasks_serially(
         }
         shared_env_for_tasks.insert(
             String::from("PREVIOUS_TASK_NAME"),
-            either::Either::Left(task_name.to_string()),
+            task_name.to_string().into(),
         );
         /*
         alternatively could add a `Vec<u8>` or `bytes` or `impl std::io::Read` field to
           the `CommonContent` struct
         */
-        if let Some(vec_u8) = common.content.as_ref() {
-            shared_env_for_tasks.insert(
-                String::from(previous_task_string_key!()),
-                std::str::from_utf8(vec_u8)
-                    .map(|s| either::Either::Left(s.to_owned()))
-                    .unwrap_or(either::Either::Right(vec_u8.to_vec())),
-            );
+        if let Some(value) = common.content.as_ref() {
+            shared_env_for_tasks
+                .insert(String::from(previous_task_string_key!()), value.to_owned());
         }
     }
     Ok(CommonContent {
@@ -63,8 +55,7 @@ impl Task {
         pipeline_name: &String,
         task_name: &String,
     ) -> Result<CommonContent, VermanSchemaError> {
-        let mut shared_env_for_cmds =
-            indexmap::IndexMap::<String, either::Either<String, Vec<u8>>>::new();
+        let mut shared_env_for_cmds = indexmap::IndexMap::<String, serde_json::Value>::new();
         let mut last_result: Result<CommonContent, VermanSchemaError> =
             Err(VermanSchemaError::NotFound("`Command`s"));
         for command in &self.commands {
@@ -144,9 +135,7 @@ impl Task {
                     shared_env_for_cmds.extend(env_for_merge.clone());
                 }
                 if let Some(vec_u8) = common.content.as_ref() {
-                    let task_content = std::str::from_utf8(vec_u8)
-                        .map(|s| either::Either::Left(s.to_owned()))
-                        .unwrap_or(either::Either::Right(vec_u8.to_vec()));
+                    let task_content = vec_u8.to_owned();
 
                     shared_env_for_cmds
                         .insert(String::from("PREVIOUS_TASK_CONTENT"), task_content.clone());
@@ -161,3 +150,7 @@ impl Task {
         last_result
     }
 }
+
+#[cfg(test)]
+#[path = "task_test.rs"]
+mod task_test;

@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use crate::commands::CommandArgs;
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Pipeline {
     pub name: String,
@@ -13,13 +13,8 @@ pub struct Pipeline {
     pub engine_version: String,
 
     /// Optional environment variables
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "de_opt_indexmap_str_or_bytes",
-        serialize_with = "se_opt_indexmap_str_or_bytes"
-    )]
-    pub env: Option<indexmap::IndexMap<String, either::Either<String, Vec<u8>>>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub env: Option<indexmap::IndexMap<String, serde_json::Value>>,
 
     /// List of pipeline stages
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -34,7 +29,7 @@ pub struct Pipeline {
     pub schemas: Option<std::collections::HashMap<String, JsonSchema>>,
 }
 
-#[derive(Debug, serde_derive::Deserialize, serde_derive::Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Stage {
     pub name: String,
@@ -44,7 +39,7 @@ pub struct Stage {
     pub sequential: bool,
 }
 
-#[derive(Debug, serde_derive::Deserialize, serde_derive::Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Task {
     pub commands: Vec<CommandArgs>,
@@ -55,19 +50,14 @@ pub struct Task {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_schema: Option<JsonSchema>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "de_opt_indexmap_str_or_bytes",
-        serialize_with = "se_opt_indexmap_str_or_bytes"
-    )]
-    pub env: Option<indexmap::IndexMap<String, either::Either<String, Vec<u8>>>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub env: Option<indexmap::IndexMap<String, serde_json::Value>>,
 }
 
 impl Task {
     pub fn from_task_merge_env(
         task: &Task,
-        env: &indexmap::IndexMap<String, either::Either<String, Vec<u8>>>,
+        env: &indexmap::IndexMap<String, serde_json::Value>,
     ) -> Task {
         Self {
             commands: task.commands.clone(),
@@ -85,242 +75,28 @@ impl Task {
     }
 }
 
-#[derive(Debug, Clone, serde_derive::Deserialize, serde_derive::Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct JsonSchema {
-    #[serde(flatten)]
-    pub schema: serde_json::Value,
-}
-
-#[macro_export]
-macro_rules! tri {
-    ($e:expr $(,)?) => {
-        match $e {
-            core::result::Result::Ok(val) => val,
-            core::result::Result::Err(err) => return core::result::Result::Err(err),
-        }
-    };
-}
+pub type JsonSchema = serde_json::Value;
 
 /********************
  * Common `struct`s *
  ********************/
 
-#[derive(Clone, Debug, Default, PartialEq, serde_derive::Deserialize, serde_derive::Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CommonContent {
     /// If `-` provided (default) then stdin / output from previous task is read
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "de__utf8_else_vecu8",
-        serialize_with = "se__utf8_else_vecu8"
-    )]
-    pub content: Option<Vec<u8>>, /* Option<impl std::io::Read> */
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<serde_json::Value>,
 
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "de_opt_indexmap_str_or_bytes",
-        serialize_with = "se_opt_indexmap_str_or_bytes"
-    )]
-    pub env: Option<indexmap::IndexMap<String, either::Either<String, Vec<u8>>>>,
-}
-
-#[allow(non_snake_case)]
-fn de__utf8_else_vecu8<'de, D>(deserializer: D) -> Result<Option<Vec<u8>>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    struct Utf8OrBytes;
-
-    impl<'de> serde::de::Visitor<'de> for Utf8OrBytes {
-        type Value = Option<Vec<u8>>;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a UTF-8 string, a byte sequence, or null")
-        }
-
-        fn visit_none<E>(self) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            Ok(None)
-        }
-
-        fn visit_unit<E>(self) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            Ok(None)
-        }
-
-        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            Ok(Some(value.as_bytes().to_vec()))
-        }
-
-        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where
-            A: serde::de::SeqAccess<'de>,
-        {
-            let mut vec = Vec::new();
-            while let Some(byte) = seq.next_element()? {
-                vec.push(byte);
-            }
-            Ok(Some(vec))
-        }
-    }
-
-    deserializer.deserialize_any(Utf8OrBytes)
-}
-
-#[allow(non_snake_case)]
-fn se__utf8_else_vecu8<S>(opt_value: &Option<Vec<u8>>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    use serde::ser::SerializeSeq;
-
-    match opt_value {
-        Some(vec) => match std::str::from_utf8(vec) {
-            Ok(utf8_str) => serializer.serialize_str(utf8_str),
-            Err(_) => {
-                let mut seq = serializer.serialize_seq(Some(vec.len()))?;
-                for &byte in vec {
-                    seq.serialize_element(&byte)?;
-                }
-                seq.end()
-            }
-        },
-        _ => serializer.serialize_none(),
-    }
-}
-
-pub fn de_opt_indexmap_str_or_bytes<'de, D>(
-    deserializer: D,
-) -> Result<Option<indexmap::IndexMap<String, either::Either<String, Vec<u8>>>>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    struct MapVisitor;
-
-    impl<'de> serde::de::Visitor<'de> for MapVisitor {
-        type Value = indexmap::IndexMap<String, either::Either<String, Vec<u8>>>;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a map with string keys and either string or byte array values")
-        }
-
-        fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-        where
-            A: serde::de::MapAccess<'de>,
-        {
-            let mut index_map = indexmap::IndexMap::new();
-            while let Some((key, value)) = map.next_entry::<String, serde_json::Value>()? {
-                let either_value = match value {
-                    serde_json::Value::String(s) => either::Either::Left(s),
-                    serde_json::Value::Array(arr) => {
-                        let bytes: Result<Vec<u8>, _> = arr
-                            .into_iter()
-                            .map(|v| match v {
-                                serde_json::Value::Number(n) => n
-                                    .as_u64()
-                                    .filter(|&val| val <= u8::MAX as u64)
-                                    .map(|val| val as u8)
-                                    .ok_or_else(|| serde::de::Error::custom("Invalid byte value")),
-                                _ => Err(serde::de::Error::custom("Expected byte values")),
-                            })
-                            .collect();
-                        either::Either::Right(bytes?)
-                    }
-                    _ => {
-                        return Err(serde::de::Error::custom(
-                            "Invalid value type for IndexMap value",
-                        ))
-                    }
-                };
-                index_map.insert(key, either_value);
-            }
-            Ok(index_map)
-        }
-    }
-
-    Ok(Some(
-        deserializer
-            .deserialize_any(MapVisitor)
-            .or(Ok(indexmap::IndexMap::new()))?,
-    ))
-}
-
-pub struct VisitorOptionMap<T>(T);
-
-impl<'de, T> serde::de::Visitor<'de> for VisitorOptionMap<T>
-where
-    T: serde::de::Visitor<'de>,
-{
-    type Value = Option<T::Value>;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        self.0.expecting(formatter)
-    }
-
-    fn visit_none<E>(self) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        Ok(None)
-    }
-
-    fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        Ok(Some(self.0.visit_some(deserializer)?))
-    }
-}
-
-pub fn se_opt_indexmap_str_or_bytes<S>(
-    kv_opt: &Option<indexmap::IndexMap<String, either::Either<String, Vec<u8>>>>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    use serde::ser::SerializeMap;
-
-    if let Some(ref index_map) = kv_opt {
-        let mut map_ser = serializer.serialize_map(Some(index_map.len()))?;
-        for (key, value) in index_map {
-            match value {
-                either::Either::Left(s) => {
-                    // Serialize string directly as a string
-                    map_ser.serialize_entry(key, s)?;
-                }
-                either::Either::Right(vec) => {
-                    if let Ok(utf8_str) = std::str::from_utf8(vec) {
-                        // It can be represented as a valid UTF-8 string
-                        map_ser.serialize_entry(key, utf8_str)?;
-                    } else {
-                        // It's not valid UTF-8, serialize as a number array (i.e., sequence of bytes)
-                        map_ser.serialize_entry(key, &vec)?;
-                    }
-                }
-            }
-        }
-        map_ser.end()
-    } else {
-        serializer.serialize_none()
-    }
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub env: Option<indexmap::IndexMap<String, serde_json::Value>>,
 }
 
 /******************
  * HTTP `struct`s *
  ******************/
 
-#[derive(Debug, Clone, serde_derive::Deserialize, serde_derive::Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct HttpArgs {
     #[serde(
@@ -375,7 +151,7 @@ where
     s.serialize_str(method.to_string().as_str())
 }
 
-#[derive(Debug, Clone, serde_derive::Deserialize, serde_derive::Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct HttpCommandArgs {
     pub args: HttpArgs,
@@ -383,14 +159,14 @@ pub struct HttpCommandArgs {
     pub expectation: Expectation,
 }
 
-#[derive(Debug, Clone, serde_derive::Deserialize, serde_derive::Serialize)]
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Expectation {
     pub status_code: u16,
     pub exit_code: i32,
 }
 
-#[derive(Debug, serde_derive::Deserialize, serde_derive::Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExpectationHttpClient {
     pub status_code: u16,

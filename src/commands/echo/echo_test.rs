@@ -3,7 +3,7 @@ use crate::models::CommonContent;
 
 #[test]
 fn echo_simple_test() {
-    let content_vec_u8 = "Hello".as_bytes().to_owned();
+    let content_vec_u8 = serde_json::Value::String(String::from("Hello"));
     let b = echo(&CommonContent {
         content: Some(content_vec_u8.clone()),
         env: None,
@@ -15,9 +15,9 @@ fn echo_simple_test() {
 #[test]
 fn echo_env_test() {
     let b = echo(&CommonContent {
-        content: Some("Hello ${VAR} var".as_bytes().to_owned()),
+        content: Some(serde_json::Value::String(String::from("Hello ${VAR} var"))),
         env: Some(indexmap::indexmap! {
-            String::from("VAR") => either::Left(String::from("${weird}"))
+            String::from("VAR") => serde_json::Value::String(String::from("${weird}"))
         }),
     })
     .unwrap();

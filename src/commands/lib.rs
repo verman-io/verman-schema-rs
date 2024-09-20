@@ -15,11 +15,17 @@ pub mod set_env;
 /*pub const VALID_COMMANDS_SET: std::collections::HashSet<&'static str> =
 std::collections::HashSet::<&'static str>::from(VALID_COMMANDS);*/
 
-#[derive(Debug, Clone, serde_derive::Deserialize, serde_derive::Serialize)]
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "cmd")]
 pub enum CommandArgs {
     Echo(CommonContent),
     HttpClient(HttpCommandArgs),
     SetEnv(CommonContent),
     Jaq(CommonContent),
+}
+
+impl Default for CommandArgs {
+    fn default() -> Self {
+        Self::Echo(CommonContent::default())
+    }
 }

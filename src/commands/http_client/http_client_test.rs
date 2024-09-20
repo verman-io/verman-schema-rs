@@ -20,9 +20,13 @@ async fn test_httpbin_post_empty_body() {
     .1
     .env
     .unwrap();
-    let out = result.get("PREVIOUS_TASK_CONTENT").unwrap();
+    let out = result
+        .get("PREVIOUS_TASK_CONTENT")
+        .unwrap()
+        .as_str()
+        .unwrap();
     let httpbin_post_response: crate::test_models::HttpBinPostResponse =
-        serde_json::from_str(out.to_owned().left().unwrap().as_str()).unwrap();
+        serde_json::from_str(out).unwrap();
     assert_eq!(httpbin_post_response.json, serde_json::Value::Null);
 }
 
@@ -41,16 +45,20 @@ async fn test_httpbin_post_message_body() {
             ])
         },
         common_content: CommonContent{
-            content: Some("{\"message\": \"greetings\"}".as_bytes().to_vec()),
+            content: Some(serde_json::Value::String(String::from("{\"message\": \"greetings\"}"))),
             // ^ could also construct `Message` and `serde_json` it down, like in next test
             ..CommonContent::default()
         },
         expectation: Expectation::default(),
     })
         .await.unwrap().1.env.unwrap();
-    let out = result.get("PREVIOUS_TASK_CONTENT").unwrap();
+    let out = result
+        .get("PREVIOUS_TASK_CONTENT")
+        .unwrap()
+        .as_str()
+        .unwrap();
     let httpbin_post_response: crate::test_models::HttpBinPostResponse =
-        serde_json::from_str(out.to_owned().left().unwrap().as_str()).unwrap();
+        serde_json::from_str(out).unwrap();
     let message: Message = serde_json::from_value(httpbin_post_response.json).unwrap();
     assert_eq!(message.message, "greetings");
 }
@@ -74,19 +82,23 @@ async fn test_httpbin_post_message_body_and_env_vars() {
             ])
         },
         common_content: CommonContent {
-            content: Some(serde_json::to_string(&message_input).unwrap().into_bytes()),
+            content: Some(serde_json::to_value(&message_input).unwrap()),
             // ^ could also construct `Message` and `serde_json` it down
             env: Some(indexmap::indexmap! {
-                    String::from("ME") => either::Left(String::from("Prine"))
+                    String::from("ME") => serde_json::Value::String(String::from("Prine"))
                 }),
             ..CommonContent::default()
         },
         expectation: Expectation::default(),
     })
         .await.unwrap().1.env.unwrap();
-    let out = result.get("PREVIOUS_TASK_CONTENT").unwrap();
+    let out = result
+        .get("PREVIOUS_TASK_CONTENT")
+        .unwrap()
+        .as_str()
+        .unwrap();
     let httpbin_post_response: crate::test_models::HttpBinPostResponse =
-        serde_json::from_str(out.to_owned().left().unwrap().as_str()).unwrap();
+        serde_json::from_str(out).unwrap();
     let message: Message = serde_json::from_value(httpbin_post_response.json).unwrap();
     assert_eq!(message.message, "greetings to Prine");
 }
