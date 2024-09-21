@@ -1,7 +1,6 @@
 use crate::errors::VermanSchemaError;
 use crate::models::CommonContent;
 use std::io::Write;
-use std::str::Utf8Error;
 
 mod jaq_utils;
 

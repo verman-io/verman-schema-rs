@@ -1,7 +1,12 @@
 use crate::models::{CommonContent, HttpCommandArgs};
 
+pub(crate) mod shared;
+
 #[path = "echo/echo.rs"]
 pub mod echo;
+
+#[path = "env/env.rs"]
+pub mod env;
 
 #[path = "http_client/http_client.rs"]
 pub mod http_client;
@@ -19,9 +24,10 @@ std::collections::HashSet::<&'static str>::from(VALID_COMMANDS);*/
 #[serde(tag = "cmd")]
 pub enum CommandArgs {
     Echo(CommonContent),
+    Env(CommonContent),
     HttpClient(HttpCommandArgs),
-    SetEnv(CommonContent),
     Jaq(CommonContent),
+    SetEnv(CommonContent),
 }
 
 impl Default for CommandArgs {

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::errors::VermanSchemaError;
-use crate::models::{CommonContent, HttpCommandArgs, Task};
+use crate::models::{CommonContent, HttpCommandArgs};
 
 /// http command.
 /// Note that because `CommonContent.content` is `serde_json::Value`, for non JSON inputs or outputs,
@@ -25,36 +25,41 @@ pub async fn http(
     let mut args = http_command_args.args.to_owned();
     if !env.is_empty() {
         /* Do interpolation and ensure input is set */
-        let mut hm = std::collections::HashMap::<String, String>::with_capacity(env.len());
-        for (k, val) in env.iter() {
-            match val {
-                serde_json::Value::String(s) => {
-                    let _ = hm.insert(k.to_owned(), s.to_owned());
-                }
-                serde_json::Value::Number(n) => {
-                    let _ = hm.insert(k.to_owned(), n.to_string().to_owned());
-                }
-                _ => {}
-            }
-        }
+        let variables =
+            {
+                let mut hm0 = std::collections::HashMap::<String, String>::with_capacity(env.len());
+                let mut hm1 = std::collections::HashMap::<String, String>::with_capacity(env.len());
+                hm0.extend(env.iter().filter_map(|(k, v)| match v {
+                    serde_json::Value::String(s) => Some((k.to_owned(), s.to_owned())),
+                    serde_json::Value::Object(m) => {
+                        hm1.extend(m.iter().map(|(key, val)| {
+                            (key.to_owned(), serde_json::to_string(val).unwrap())
+                        }));
+                        None
+                    }
+                    _ => None,
+                }));
+                hm0.extend(hm1);
+                hm0
+            };
 
         args.method = http::method::Method::from_str(
-            subst::substitute(args.method.to_string().as_str(), &hm)?.as_str(),
+            subst::substitute(args.method.to_string().as_str(), &variables)?.as_str(),
         )?;
         args.url = http::uri::Uri::from_str(
-            subst::substitute(args.url.to_string().as_str(), &hm)?.as_str(),
+            subst::substitute(args.url.to_string().as_str(), &variables)?.as_str(),
         )?;
 
         match body {
             Some(serde_json::Value::String(bod)) => {
                 body = Some(serde_json::Value::String(subst::substitute(
                     bod.as_str(),
-                    &hm,
+                    &variables,
                 )?));
             }
             Some(val) => {
                 body = Some(serde_json::from_str(
-                    subst::substitute(serde_json::to_string(&val)?.as_str(), &hm)?.as_str(),
+                    subst::substitute(serde_json::to_string(&val)?.as_str(), &variables)?.as_str(),
                 )?);
             }
             _ => {}

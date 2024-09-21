@@ -162,6 +162,7 @@ pub struct HttpCommandArgs<T = serde_json::Value> {
 }
 
 impl HttpCommandArgs {
+    #[cfg(test)]
     pub(crate) fn new(
         args: HttpArgs,
         common_content: CommonContent,

@@ -236,7 +236,8 @@ async fn one_echo_one_http_command_in_one_task_pipeline_test() {
     };
     /*
     println!("{}", serde_json::to_string_pretty(&pipeline5).unwrap());
-    println!("{}", toml::to_string(&pipeline5).unwrap()); */
+    println!("{}", toml::to_string(&pipeline5).unwrap());
+    */
     let common = pipeline5.process().await.unwrap();
     let env = common.env.unwrap();
     assert_eq!(
