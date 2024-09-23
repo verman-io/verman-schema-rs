@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use crate::commands::shared::make_subst_map;
 use crate::errors::VermanSchemaError;
 use crate::models::{CommonContent, HttpCommandArgs};
 
@@ -25,23 +26,7 @@ pub async fn http(
     let mut args = http_command_args.args.to_owned();
     if !env.is_empty() {
         /* Do interpolation and ensure input is set */
-        let variables =
-            {
-                let mut hm0 = std::collections::HashMap::<String, String>::with_capacity(env.len());
-                let mut hm1 = std::collections::HashMap::<String, String>::with_capacity(env.len());
-                hm0.extend(env.iter().filter_map(|(k, v)| match v {
-                    serde_json::Value::String(s) => Some((k.to_owned(), s.to_owned())),
-                    serde_json::Value::Object(m) => {
-                        hm1.extend(m.iter().map(|(key, val)| {
-                            (key.to_owned(), serde_json::to_string(val).unwrap())
-                        }));
-                        None
-                    }
-                    _ => None,
-                }));
-                hm0.extend(hm1);
-                hm0
-            };
+        let variables = make_subst_map(&env);
 
         args.method = http::method::Method::from_str(
             subst::substitute(args.method.to_string().as_str(), &variables)?.as_str(),

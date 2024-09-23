@@ -11,6 +11,9 @@ pub mod env;
 #[path = "http_client/http_client.rs"]
 pub mod http_client;
 
+#[path = "interpolate/interpolate.rs"]
+pub mod interpolate;
+
 #[path = "jaq/jaq.rs"]
 pub mod jaq;
 
@@ -26,6 +29,7 @@ pub enum CommandArgs {
     Echo(CommonContent),
     Env(CommonContent),
     HttpClient(HttpCommandArgs),
+    Interpolate(CommonContent),
     Jaq(CommonContent),
     SetEnv(CommonContent),
 }

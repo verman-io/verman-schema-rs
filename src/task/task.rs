@@ -56,7 +56,7 @@ impl Task {
         &self,
         pipeline_name: &String,
         task_name: &String,
-        idx: usize
+        idx: usize,
     ) -> Result<CommonContent, VermanSchemaError> {
         let mut shared_env_for_cmds = indexmap::IndexMap::<String, serde_json::Value>::new();
         let mut last_result: Result<CommonContent, VermanSchemaError> =
@@ -73,6 +73,14 @@ impl Task {
                             arg,
                         )?;
                     crate::commands::echo::echo(&common_with_merged_env)
+                }
+                CommandArgs::Env(arg) => {
+                    let common_with_merged_env =
+                        Self::handle_shared_env_for_common_content_command(
+                            &mut shared_env_for_cmds,
+                            arg,
+                        )?;
+                    crate::commands::env::env(&common_with_merged_env)
                 }
                 CommandArgs::HttpClient(ref arg) => {
                     let mut common_with_merged_env = arg.to_owned();
@@ -92,13 +100,13 @@ impl Task {
                         crate::commands::http_client::http(&common_with_merged_env).await?;
                     Ok(common)
                 }
-                CommandArgs::SetEnv(ref arg) => {
+                CommandArgs::Interpolate(ref arg) => {
                     let common_with_merged_env =
                         Self::handle_shared_env_for_common_content_command(
                             &mut shared_env_for_cmds,
                             arg,
                         )?;
-                    crate::commands::set_env::set_env(&common_with_merged_env)
+                    crate::commands::interpolate::interpolate(&common_with_merged_env)
                 }
                 CommandArgs::Jaq(ref arg) => {
                     let mut common_with_merged_env = arg.to_owned();
@@ -116,13 +124,13 @@ impl Task {
 
                     Ok(crate::commands::jaq::jaq(&common_with_merged_env)?)
                 }
-                CommandArgs::Env(arg) => {
+                CommandArgs::SetEnv(ref arg) => {
                     let common_with_merged_env =
                         Self::handle_shared_env_for_common_content_command(
                             &mut shared_env_for_cmds,
                             arg,
                         )?;
-                    crate::commands::env::env(&common_with_merged_env)
+                    crate::commands::set_env::set_env(&common_with_merged_env)
                 }
             }; /* fail at first failing task, without retries or force continuing */
             if let Ok(common) = last_result {
@@ -135,7 +143,10 @@ impl Task {
                     shared_env_for_cmds
                         .insert(String::from("PREVIOUS_TASK_CONTENT"), task_content.clone());
                     shared_env_for_cmds.insert(
-                        String::from(format!("{}__{}[{}]_TASK_CONTENT", pipeline_name, task_name, idx)),
+                        String::from(format!(
+                            "{}__{}[{}]_TASK_CONTENT",
+                            pipeline_name, task_name, idx
+                        )),
                         task_content.clone(),
                     );
                     shared_env_for_cmds.insert(
