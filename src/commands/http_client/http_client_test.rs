@@ -1,3 +1,4 @@
+use crate::commands::command::CommandKey;
 use crate::commands::http_client::http;
 use crate::models::{CommonContent, Expectation, HttpArgs, HttpCommandArgs};
 use crate::test_models::{Message, HTTPBIN_URL};
@@ -20,7 +21,9 @@ async fn test_httpbin_post_empty_body() {
     .1
     .env
     .unwrap();
-    let previous_task_content = result.get("PREVIOUS_TASK_CONTENT").unwrap();
+    let previous_task_content = result
+        .get(CommandKey::PreviousContent.to_string().as_str())
+        .unwrap();
     let httpbin_post_response: crate::test_models::HttpBinPostResponse =
         serde_json::from_value(previous_task_content.to_owned()).unwrap();
     assert_eq!(httpbin_post_response.json, serde_json::Value::Null);
@@ -47,8 +50,10 @@ async fn test_httpbin_post_message_body() {
         Expectation::default(),
     ))
         .await.unwrap().1.env.unwrap();
-    assert!(result.contains_key("PREVIOUS_TASK_CONTENT"));
-    let previous_task_content = result.get("PREVIOUS_TASK_CONTENT").unwrap();
+    assert!(result.contains_key(CommandKey::PreviousContent.to_string().as_str()));
+    let previous_task_content = result
+        .get(CommandKey::PreviousContent.to_string().as_str())
+        .unwrap();
     let httpbin_post_response: crate::test_models::HttpBinPostResponse<Message> =
         serde_json::from_value(previous_task_content.to_owned()).unwrap();
     let message0: Message = serde_json::from_str(httpbin_post_response.data.as_str()).unwrap();
@@ -87,7 +92,9 @@ async fn test_httpbin_post_message_body_and_env_vars() {
     ))
         .await.unwrap().1.env.unwrap();
 
-    let previous_task_content = result.get("PREVIOUS_TASK_CONTENT").unwrap();
+    let previous_task_content = result
+        .get(CommandKey::PreviousContent.to_string().as_str())
+        .unwrap();
     let httpbin_post_response: crate::test_models::HttpBinPostResponse =
         serde_json::from_value(previous_task_content.to_owned()).unwrap();
     let message: Message = serde_json::from_value(httpbin_post_response.json).unwrap();

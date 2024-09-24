@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use crate::commands::CommandArgs;
+use crate::commands::command::Command;
 
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
@@ -42,7 +42,7 @@ pub struct Stage {
 #[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Task {
-    pub commands: Vec<CommandArgs>,
+    pub commands: Vec<Command>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_schema: Option<JsonSchema>,
@@ -52,27 +52,6 @@ pub struct Task {
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub env: Option<indexmap::IndexMap<String, serde_json::Value>>,
-}
-
-impl Task {
-    pub fn from_task_merge_env(
-        task: &Task,
-        env: &indexmap::IndexMap<String, serde_json::Value>,
-    ) -> Task {
-        Self {
-            commands: task.commands.clone(),
-            input_schema: task.input_schema.clone(),
-            output_schema: task.output_schema.clone(),
-            env: match &task.env {
-                Some(ref e) => {
-                    let mut new_env = e.clone();
-                    new_env.extend(env.clone());
-                    Some(new_env)
-                }
-                None => Some(env.clone()),
-            },
-        }
-    }
 }
 
 pub type JsonSchema = serde_json::Value;

@@ -1,10 +1,10 @@
-use crate::commands::CommandArgs;
+use crate::commands::command::Command;
 use crate::models::{CommonContent, Task};
 
 #[test]
 fn test_task_string_env_value() {
     let task0 = Task {
-        commands: vec![CommandArgs::Echo(CommonContent {
+        commands: vec![Command::Echo(CommonContent {
             content: Some(serde_json::Value::String(String::from("${math_messages}"))),
             env: Some(indexmap::indexmap! {
                 String::from("Foo") => serde_json::Value::String(String::from("Bar"))
@@ -24,7 +24,7 @@ const TASK1_S_RAW: &'static str = r###"{"commands":[{"cmd":"Echo","content":"${m
 #[test]
 fn test_task_json_env_value() {
     let task1 = Task {
-        commands: vec![CommandArgs::Echo(CommonContent {
+        commands: vec![Command::Echo(CommonContent {
             content: Some(serde_json::Value::String(String::from("${math_messages}"))),
             env: Some(indexmap::indexmap! {
                 String::from("weird") => serde_json::Value::String(String::from("[{\"cmd\":\"Echo\",\"content\":\"${math_messages}\",\"env\":{\"Foo\":\"Bar\"}}]"))
@@ -44,7 +44,7 @@ fn test_task_serialise_into_env_from_json_value() {
     let task2: Task = serde_json::from_str(task2_s).unwrap();
     println!("{:?}", task2);
     let _task2_wanted = Task {
-        commands: vec![CommandArgs::Echo(CommonContent {
+        commands: vec![Command::Echo(CommonContent {
             content: Some(serde_json::Value::String(String::from("${math_messages}"))),
             env: Some(indexmap::indexmap! {
                 String::from("weird") => serde_json::Value::String(String::new())

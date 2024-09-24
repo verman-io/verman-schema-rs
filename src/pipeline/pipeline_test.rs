@@ -1,5 +1,7 @@
-use crate::commands::CommandArgs;
+use crate::commands::command::{Command, CommandKey};
+use crate::errors::VermanSchemaError;
 use crate::models::{CommonContent, HttpArgs, HttpCommandArgs, Pipeline, Task};
+use crate::task::task::TaskKey;
 use crate::test_models::{HttpBinPostResponse, Message, HTTPBIN_URL};
 
 lazy_static::lazy_static! {
@@ -72,7 +74,7 @@ async fn one_empty_echo_task_one_command_pipeline_test() {
         env: None,
         pipe: None,
         tasks: Some(indexmap::indexmap! { String::from("task0") => Task {
-            commands: vec![CommandArgs::Echo(CommonContent {
+            commands: vec![Command::Echo(CommonContent {
                     content: None,
                     env: None,
                 }),
@@ -85,7 +87,12 @@ async fn one_empty_echo_task_one_command_pipeline_test() {
         ..Pipeline::default()
     };
 
-    let _ = pipeline3.process().await.unwrap();
+    let r = pipeline3.process().await;
+    assert!(!r.is_ok());
+    assert_eq!(
+        r.err().unwrap().to_string(),
+        VermanSchemaError::NotFound("").to_string()
+    );
 }
 
 #[tokio::test]
@@ -100,7 +107,7 @@ async fn one_echo_task_pipeline_test() {
         tasks: Some(indexmap::indexmap! {
         String::from("task0") =>
         Task {
-            commands: vec![CommandArgs::Echo(CommonContent {
+            commands: vec![Command::Echo(CommonContent {
                     content: Some(serde_json::Value::String(String::from("FOO is set to ${FOO}"))),
                     env: Some(indexmap::indexmap! {
                         String::from("FOO") => serde_json::Value::String(String::from("bar"))
@@ -117,11 +124,12 @@ async fn one_echo_task_pipeline_test() {
     let common = pipeline4.process().await.unwrap();
     let env = common.env.unwrap();
     assert_eq!(
-        env.get("PREVIOUS_TASK_NAME").unwrap(),
+        env.get(TaskKey::PreviousName.to_string().as_str()).unwrap(),
         &serde_json::Value::String(String::from("task0"))
     );
     assert_eq!(
-        env.get("PREVIOUS_TASK_CONTENT").unwrap(),
+        env.get(CommandKey::PreviousContent.to_string().as_str())
+            .unwrap(),
         &serde_json::Value::String(String::from("FOO is set to bar"))
     )
 }
@@ -129,7 +137,7 @@ async fn one_echo_task_pipeline_test() {
 #[tokio::test]
 async fn one_http_task_pipeline_test() {
     let message_input = Message {
-        message: String::from("greetings to ${ME}"),
+        message: String::from("greetings to thee"),
     };
     let pipeline5: Pipeline = Pipeline {
         name: String::from(env!("CARGO_PKG_NAME")),
@@ -141,7 +149,7 @@ async fn one_http_task_pipeline_test() {
         tasks: Some(indexmap::indexmap! {
         String::from("task0") =>
         Task {
-            commands: vec![CommandArgs::HttpClient(HttpCommandArgs::new(
+            commands: vec![Command::HttpClient(HttpCommandArgs::new(
                     HttpArgs {
                         url: format!("{}/post", HTTPBIN_URL)
                             .parse::<http::uri::Uri>()
@@ -168,7 +176,7 @@ async fn one_http_task_pipeline_test() {
     let common = pipeline5.process().await.unwrap();
     let env = common.env.unwrap();
     assert_eq!(
-        env.get("PREVIOUS_TASK_TYPE")
+        env.get(CommandKey::PreviousType.to_string().as_str())
             .unwrap()
             .to_owned()
             .as_str()
@@ -176,11 +184,18 @@ async fn one_http_task_pipeline_test() {
         "JSON"
     );
     assert_eq!(
-        env.get("PREVIOUS_TASK_NAME").unwrap().as_str().unwrap(),
+        env.get(TaskKey::PreviousName.to_string().as_str())
+            .unwrap()
+            .as_str()
+            .unwrap(),
         "task0"
     );
-    let http_bin_post_response: HttpBinPostResponse =
-        serde_json::from_value(env.get("PREVIOUS_TASK_CONTENT").unwrap().to_owned()).unwrap();
+    let http_bin_post_response: HttpBinPostResponse = serde_json::from_value(
+        env.get(CommandKey::PreviousContent.to_string().as_str())
+            .unwrap()
+            .to_owned(),
+    )
+    .unwrap();
     let message_response: Message =
         serde_json::from_str(http_bin_post_response.data.as_str()).unwrap();
     assert_eq!(message_response, message_input);
@@ -202,13 +217,13 @@ async fn one_echo_one_http_command_in_one_task_pipeline_test() {
         String::from("task0") =>
         Task {
             commands: vec![
-                CommandArgs::Echo(CommonContent {
+                Command::Echo(CommonContent {
                         content: Some(serde_json::to_value(&message_input).unwrap()),
                         env: Some(indexmap::indexmap! {
                             String::from("ME") => serde_json::Value::String(String::from("Omega"))
                         }),
                     }),
-                CommandArgs::HttpClient(HttpCommandArgs::new(
+                Command::HttpClient(HttpCommandArgs::new(
                         HttpArgs {
                             url: format!("{}/post", HTTPBIN_URL)
                                 .parse::<http::uri::Uri>()
@@ -241,15 +256,27 @@ async fn one_echo_one_http_command_in_one_task_pipeline_test() {
     let common = pipeline5.process().await.unwrap();
     let env = common.env.unwrap();
     assert_eq!(
-        env.get("PREVIOUS_TASK_TYPE").unwrap().as_str().unwrap(),
+        env.get(CommandKey::PreviousType.to_string().as_str())
+            .unwrap()
+            .as_str()
+            .unwrap(),
         String::from("JSON")
     );
     assert_eq!(
-        env.get("PREVIOUS_TASK_NAME").unwrap().as_str().unwrap(),
+        env.get(TaskKey::PreviousName.to_string().as_str())
+            .unwrap()
+            .as_str()
+            .unwrap(),
         String::from("task0")
     );
-    let previous_task_content = env.get("PREVIOUS_TASK_CONTENT").unwrap();
-    let httpbin_post_response: crate::test_models::HttpBinPostResponse<Message> =
+    let previous_task_content = env
+        .get(CommandKey::PreviousContent.to_string().as_str())
+        .unwrap();
+    assert_ne!(
+        previous_task_content.get("json").unwrap(),
+        &serde_json::Value::Null
+    );
+    let httpbin_post_response: HttpBinPostResponse<Message> =
         serde_json::from_value(previous_task_content.to_owned()).unwrap();
     assert_eq!(
         httpbin_post_response.json,
@@ -274,17 +301,17 @@ async fn one_set_env_one_echo_one_http_command_one_jaq_in_one_task_pipeline_test
         tasks: Some(indexmap::indexmap! {
         String::from("task0") => Task {
             commands: vec![
-                CommandArgs::SetEnv(CommonContent {
+                Command::SetEnv(CommonContent {
                         content: None,
                         env: Some(indexmap::indexmap! {
                             String::from("ME") => serde_json::Value::String(String::from("Omega"))
                         })
                     }),
-                CommandArgs::Echo(CommonContent {
+                Command::Echo(CommonContent {
                         content: Some(serde_json::to_value(&message_input).unwrap()),
                         env: None,
                     }),
-                CommandArgs::HttpClient(HttpCommandArgs::new(
+                Command::HttpClient(HttpCommandArgs::new(
                         HttpArgs {
                             url: format!("{}/post", HTTPBIN_URL)
                                 .parse::<http::uri::Uri>()
@@ -301,7 +328,7 @@ async fn one_set_env_one_echo_one_http_command_one_jaq_in_one_task_pipeline_test
                         },
                         Default::default(),
                     )),
-                    CommandArgs::Jaq(CommonContent {
+                    Command::Jaq(CommonContent {
                         content: Some(serde_json::Value::String(String::from(".json.message"))),
                         env: None,
                     })
@@ -321,7 +348,7 @@ async fn one_set_env_one_echo_one_http_command_one_jaq_in_one_task_pipeline_test
     println!("{}", toml::to_string(&pipeline6).unwrap());
     */
     assert_eq!(
-        env.get("PREVIOUS_TASK_NAME")
+        env.get(TaskKey::PreviousName.to_string().as_str())
             .unwrap()
             .as_str()
             .unwrap()
@@ -329,7 +356,7 @@ async fn one_set_env_one_echo_one_http_command_one_jaq_in_one_task_pipeline_test
         String::from("task0")
     );
     let jaqed_message_response: String = env
-        .get("PREVIOUS_TASK_CONTENT")
+        .get(CommandKey::PreviousContent.to_string().as_str())
         .unwrap()
         .as_str()
         .unwrap()

@@ -1,9 +1,10 @@
-use crate::commands::shared::make_subst_map;
+use crate::commands::shared::{interpolate_input_else_get_prior_output, make_subst_map};
 use crate::errors::VermanSchemaError;
 use crate::models::CommonContent;
 
 pub fn interpolate(common_content: &CommonContent) -> Result<CommonContent, VermanSchemaError> {
-    if let Some(ref content) = common_content.content {
+    let common_content_out = interpolate_input_else_get_prior_output(common_content)?;
+    if let Some(ref content) = common_content_out.content {
         if let Some(ref env) = common_content.env {
             let variables = make_subst_map(env);
             let (mut content_s, was_str) = match content {
@@ -13,17 +14,20 @@ pub fn interpolate(common_content: &CommonContent) -> Result<CommonContent, Verm
             for _ in 0..10 {
                 content_s = subst::substitute(&content_s, &variables)?;
             }
-            return Ok(CommonContent {
+            Ok(CommonContent {
                 content: Some(if was_str {
                     serde_json::Value::String(content_s)
                 } else {
                     serde_json::from_str(content_s.as_str())?
                 }),
                 env: Some(env.to_owned()),
-            });
+            })
+        } else {
+            Ok(common_content.to_owned())
         }
+    } else {
+        Ok(common_content.to_owned())
     }
-    Ok(common_content.to_owned())
 }
 
 #[cfg(test)]

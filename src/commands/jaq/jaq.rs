@@ -1,18 +1,23 @@
+use std::io::Write;
+
+use crate::commands::command::CommandKey;
+use crate::commands::shared::interpolate_input_else_get_prior_output;
 use crate::errors::VermanSchemaError;
 use crate::models::CommonContent;
-use std::io::Write;
 
 mod jaq_utils;
 
 pub fn jaq(common_content: &CommonContent) -> Result<CommonContent, VermanSchemaError> {
-    let content = common_content.content.clone();
-    let env = common_content.env.clone();
+    let common_content_out = interpolate_input_else_get_prior_output(common_content)?;
+
+    let content = common_content_out.content.clone();
+    let env = common_content_out.env.clone();
 
     let input = Box::new(std::iter::once(Ok(match env {
         None => Err(VermanSchemaError::NotFound("Any content")),
         Some(envi) => {
             let json: serde_json::Value = envi
-                .get(&String::from("PREVIOUS_TASK_CONTENT"))
+                .get(CommandKey::PreviousContent.to_string().as_str())
                 .ok_or_else(|| VermanSchemaError::NotFound("Any content"))?
                 .to_owned();
             Ok(jaq_json::Val::from(json))

@@ -24,6 +24,7 @@ serde_json = { version = "^1", features = ["indexmap", "preserve_order"] }
 subst = { version = "^0.3", features = ["preserve-order"] }
 tokio = { version = "^1.40", features = ["macros"] }
 toml = { version = "^0.8", features = ["indexmap", "preserve_order"] }
+serde_yaml = "0.9.34"
 
 [features]
 # Use an arbitrary precision number representation for JSON `Number`. This

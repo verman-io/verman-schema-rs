@@ -1,5 +1,6 @@
 use std::str::pattern::Pattern;
 
+use crate::commands::command::CommandKey;
 use crate::errors::VermanSchemaError;
 use crate::models::CommonContent;
 
@@ -30,16 +31,16 @@ pub(crate) fn interpolate_input_with_env(
         })
     };
     match content {
-        None => match env.get("PREVIOUS_TASK_CONTENT") {
+        None => match env.get(CommandKey::PreviousContent.to_string().as_str()) {
             Some(previous_task_output) => substitute_success(previous_task_output),
             None => Err(VermanSchemaError::NotFound("input to provide")),
         },
         Some(input) => match input {
-            serde_json::Value::String(_) => {
-                let mut input_s = input.to_owned().as_str().unwrap().to_string();
+            serde_json::Value::String(s) => {
+                let mut input_s = s;
                 if input_s.len() == 1 && String::from("-").is_prefix_of(input_s.as_str()) {
                     if let Some(serde_json::Value::String(previous_task_output)) =
-                        env.get("PREVIOUS_TASK_CONTENT")
+                        env.get(CommandKey::PreviousContent.to_string().as_str())
                     {
                         input_s = previous_task_output.to_string();
                     }
@@ -48,7 +49,7 @@ pub(crate) fn interpolate_input_with_env(
             }
             serde_json::Value::Null => {
                 if let Some(serde_json::Value::String(previous_task_output)) =
-                    env.get("PREVIOUS_TASK_CONTENT")
+                    env.get(CommandKey::PreviousContent.to_string().as_str())
                 {
                     substitute_success(&serde_json::Value::String(previous_task_output.to_string()))
                 } else {
@@ -60,22 +61,49 @@ pub(crate) fn interpolate_input_with_env(
     }
 }
 
+pub(crate) fn interpolate_input_else_get_prior_output(
+    common_content: &CommonContent,
+) -> Result<CommonContent, VermanSchemaError> {
+    let common_content_out = {
+        let mut common = match interpolate_input_with_env(common_content) {
+            Ok(out) => out,
+            Err(e) => match e {
+                VermanSchemaError::NotFound(_) => CommonContent {
+                    env: common_content.env.clone(),
+                    content: None,
+                },
+                err @ _ => return Err(err),
+            },
+        };
+        if common.content.is_none() {
+            if let Some(ref env) = common.env {
+                common.content = env
+                    .get(CommandKey::PreviousContent.to_string().as_str())
+                    .map(|v| v.to_owned())
+            }
+        }
+        common
+    };
+    Ok(common_content_out)
+}
+
 pub(crate) fn make_subst_map(
     env: &indexmap::IndexMap<String, serde_json::Value>,
 ) -> std::collections::HashMap<String, String> {
-    let mut hm0 = std::collections::HashMap::<String, String>::with_capacity(env.len());
-    let mut hm1 = std::collections::HashMap::<String, String>::new();
-    hm0.extend(env.iter().filter_map(|(k, v)| match v {
-        serde_json::Value::String(s) => Some((k.to_owned(), s.to_owned())),
-        serde_json::Value::Object(m) => {
-            hm1.extend(
-                m.iter()
-                    .map(|(key, val)| (key.to_owned(), serde_json::to_string(val).unwrap())),
-            );
-            None
-        }
-        _ => None,
+    let mut hm = std::collections::HashMap::<String, String>::with_capacity(env.len());
+    hm.extend(env.iter().filter_map(|(k, v)| match v {
+            serde_json::Value::String(s) => Some((k.to_owned(), s.to_owned())),
+            serde_json::Value::Number(n) => Some((k.to_owned(), n.to_string())),
+            v @ _ => Some((k.to_owned(), serde_json::to_string(v).unwrap())),
     }));
-    hm0.extend(hm1);
-    hm0
+    hm
+}
+
+pub fn merge_env(
+    inferior: &mut indexmap::IndexMap<String, serde_json::Value>,
+    superior: &Option<indexmap::IndexMap<String, serde_json::Value>>,
+) {
+    if let Some(env) = superior {
+        inferior.extend(env.to_owned())
+    }
 }

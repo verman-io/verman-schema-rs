@@ -16,16 +16,19 @@ pub enum VermanSchemaError {
     #[error(ignore)]
     #[from(skip)]
     #[display("{_0:?}")]
-    TaskFailedToStart(String) = 597,
+    TaskFailedToStart(String) = 595,
 
     #[error(ignore)]
     #[display("{_0:?}")]
-    HttpError(u16) = 598,
+    HttpError(u16) = 596,
+
+    #[display("{_0:?}\r\n{_1:?}")]
+    HttpErrorWithBody(u16, String) = 597,
 
     #[error(ignore)]
     #[from(skip)]
     #[display("{_0:?}")]
-    NotInstalled(String) = 599,
+    NotInstalled(String) = 598,
 
     // ************************
     // * Library level errors *
@@ -42,6 +45,9 @@ pub enum VermanSchemaError {
 
     #[display("`serde_json::Error` error. {error:?}")]
     SerdeJsonError { error: serde_json::Error } = 721,
+
+    #[display("`serde_yaml::Error` error. {error:?}")]
+    SerdeYamlError { error: serde_yaml::Error } = 722,
 
     #[display("`reqwest::Error` error. {error:?}")]
     ReqwestError { error: reqwest::Error } = 732,
@@ -142,13 +148,13 @@ impl<T: std::any::Any> std::process::Termination for SuccessOrVermanSchemaError<
 
         match self {
             SuccessOrVermanSchemaError::Ok(e)
-                if std::any::TypeId::of::<T>()
-                    == std::any::TypeId::of::<std::process::ExitCode>() =>
-            {
-                *(&e as &dyn std::any::Any)
-                    .downcast_ref::<std::process::ExitCode>()
-                    .unwrap()
-            }
+            if std::any::TypeId::of::<T>()
+                == std::any::TypeId::of::<std::process::ExitCode>() =>
+                {
+                    *(&e as &dyn std::any::Any)
+                        .downcast_ref::<std::process::ExitCode>()
+                        .unwrap()
+                }
             SuccessOrVermanSchemaError::Ok(_) => std::process::ExitCode::SUCCESS,
             SuccessOrVermanSchemaError::Err(err) => match err {
                 VermanSchemaError::StdIoError { ref error } if error.raw_os_error().is_some() => {
@@ -168,7 +174,7 @@ impl<T: std::any::Any> std::process::Termination for SuccessOrVermanSchemaError<
 
 // TODO: Get `Into<VermanSchemaError>` syntax working
 impl std::ops::FromResidual<Result<std::convert::Infallible, VermanSchemaError>>
-    for SuccessOrVermanSchemaError<std::process::ExitCode>
+for SuccessOrVermanSchemaError<std::process::ExitCode>
 {
     fn from_residual(residual: Result<std::convert::Infallible, VermanSchemaError>) -> Self {
         SuccessOrVermanSchemaError::Err(residual./*into_*/err().unwrap())
@@ -176,7 +182,7 @@ impl std::ops::FromResidual<Result<std::convert::Infallible, VermanSchemaError>>
 }
 
 impl std::ops::FromResidual<Result<std::convert::Infallible, std::io::Error>>
-    for SuccessOrVermanSchemaError<std::process::ExitCode>
+for SuccessOrVermanSchemaError<std::process::ExitCode>
 {
     fn from_residual(residual: Result<std::convert::Infallible, std::io::Error>) -> Self {
         SuccessOrVermanSchemaError::Err(VermanSchemaError::from(residual./*into_*/err().unwrap()))

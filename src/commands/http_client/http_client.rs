@@ -1,12 +1,13 @@
 use std::str::FromStr;
 
+use crate::commands::command::CommandKey;
 use crate::commands::shared::make_subst_map;
 use crate::errors::VermanSchemaError;
 use crate::models::{CommonContent, HttpCommandArgs};
 
 /// http command.
 /// Note that because `CommonContent.content` is `serde_json::Value`, for non JSON inputs or outputs,
-/// you'll want to create a new `http` command, possibly that accepts Vec<u8>.
+/// you'll want to create a new `http` command, possibly that accepts `Vec<u8>`.
 /// (which can be done by removing `.json(` below and using a `serde_json::Value` with
 /// `serde_json::Value::Array(Vec::<serde_json::Value::Number()>::new())`)
 pub async fn http(
@@ -21,10 +22,15 @@ pub async fn http(
         .env
         .to_owned()
         .unwrap_or_else(|| indexmap::IndexMap::<String, serde_json::Value>::new());
-    body = body.or_else(|| env.get("PREVIOUS_TASK_CONTENT").cloned());
+    body = body.or_else(|| {
+        env.get(CommandKey::PreviousContent.to_string().as_str())
+            .cloned()
+    });
 
     let mut args = http_command_args.args.to_owned();
-    if !env.is_empty() {
+    let variables: std::collections::HashMap<String, String> = if env.is_empty() {
+        std::collections::HashMap::<String, String>::new()
+    } else {
         /* Do interpolation and ensure input is set */
         let variables = make_subst_map(&env);
 
@@ -36,9 +42,9 @@ pub async fn http(
         )?;
 
         match body {
-            Some(serde_json::Value::String(bod)) => {
+            Some(serde_json::Value::String(s)) => {
                 body = Some(serde_json::Value::String(subst::substitute(
-                    bod.as_str(),
+                    s.as_str(),
                     &variables,
                 )?));
             }
@@ -48,25 +54,28 @@ pub async fn http(
                 )?);
             }
             _ => {}
-        }
-    }
+        };
+        variables
+    };
     let client = reqwest::Client::new();
     let mut req = client.request(args.method, args.url.to_string());
     if let Some(headers) = args.headers {
-        req = req.headers(indexmap_of_ValueNoObj_to_HeaderMap(&headers)?);
+        req = req.headers(indexmap_of_ValueNoObj_to_HeaderMap(&headers, &variables)?);
     }
-    if let Some(bod) = body {
-        req = req.json(&bod);
+    if let Some(val) = body {
+        req = req.json(&val);
     }
     /*******************************
      * Execute then check response *
      *******************************/
-    // log::info!("{:#?}", req);
     let res = req.send().await?;
 
     let status_code = res.status().as_u16();
     if status_code != http_command_args.expectation.status_code {
-        return Err(VermanSchemaError::HttpError(status_code));
+        return match res.text().await {
+            Ok(error_text) => Err(VermanSchemaError::HttpErrorWithBody(status_code, error_text)),
+            Err(_) => Err(VermanSchemaError::HttpError(status_code)),
+        };
     }
     let headers = res.headers().clone();
     let content_type_opt = headers.get("Content-Type").map(|e| e.to_str().unwrap());
@@ -76,13 +85,13 @@ pub async fn http(
             CommonContent {
                 env: Some(indexmap::IndexMap::<String, serde_json::Value>::from([
                     (
-                        String::from("PREVIOUS_TASK_CONTENT"),
+                        CommandKey::PreviousContent.to_string(),
                         serde_json::from_str::<serde_json::Value>(
                             res./*json()*/text().await?.as_str(),
                         )?,
                     ),
                     (
-                        String::from("PREVIOUS_TASK_TYPE"),
+                        CommandKey::PreviousType.to_string(),
                         serde_json::Value::String(String::from("JSON")),
                     ),
                 ])),
@@ -101,8 +110,8 @@ pub async fn http(
                 None,
                 CommonContent {
                     env: Some(indexmap::indexmap! {
-                        String::from("PREVIOUS_TASK_CONTENT") => serde_json::Value::String(res.text().await?),
-                        String::from("PREVIOUS_TASK_TYPE") => serde_json::Value::String(task_type.to_string())
+                        CommandKey::PreviousContent.to_string() => serde_json::Value::String(res.text().await?),
+                        CommandKey::PreviousType.to_string() => serde_json::Value::String(task_type.to_string())
                     }),
                     ..CommonContent::default()
                 },
@@ -112,8 +121,8 @@ pub async fn http(
             None,
             CommonContent {
                 env: Some(indexmap::indexmap! {
-                    String::from("PREVIOUS_TASK_CONTENT") => serde_json::from_slice(res.bytes().await?.iter().as_slice())?,
-                    String::from("PREVIOUS_TASK_TYPE") => serde_json::Value::String(String::from(content_type.unwrap()))
+                    CommandKey::PreviousContent.to_string() => serde_json::from_slice(res.bytes().await?.iter().as_slice())?,
+                    CommandKey::PreviousType.to_string() => serde_json::Value::String(String::from(content_type.unwrap()))
                 }),
                 ..CommonContent::default()
             },
@@ -124,6 +133,7 @@ pub async fn http(
 #[allow(non_snake_case)]
 fn indexmap_of_ValueNoObj_to_HeaderMap(
     v: &Vec<indexmap::IndexMap<String, serde_json_extensions::ValueNoObjOrArr>>,
+    variables: &std::collections::HashMap<String, String>,
 ) -> Result<http::header::HeaderMap, VermanSchemaError> {
     let mut headers = http::header::HeaderMap::with_capacity(v.len());
     for index_map in v.iter() {
@@ -131,7 +141,16 @@ fn indexmap_of_ValueNoObj_to_HeaderMap(
             let header_value = header_value_from_value_no_obj(v)?;
             headers.insert(
                 http::header::HeaderName::from_str(k.as_str())?,
-                header_value,
+                if variables.is_empty() {
+                    header_value
+                } else {
+                    match header_value.to_str() {
+                        Ok(s) => {
+                            http::header::HeaderValue::from_str(&subst::substitute(s, variables)?)?
+                        }
+                        Err(_) => header_value,
+                    }
+                },
             );
         }
     }

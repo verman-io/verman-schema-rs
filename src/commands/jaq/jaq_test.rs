@@ -64,7 +64,7 @@ fn test_jaq() {
     let input_common = CommonContent {
         content: Some(serde_json::Value::String(String::from(".[1]"))),
         env: Some(indexmap::indexmap! {
-            String::from("PREVIOUS_TASK_CONTENT") => serde_json::json!([1,{"stuff": true}])
+            CommandKey::PreviousContent.to_string() => serde_json::json!([1,{"stuff": true}])
         }),
     };
     let result_common = jaq(&input_common).unwrap();
