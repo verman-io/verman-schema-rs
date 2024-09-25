@@ -6,6 +6,7 @@ use crate::models::CommonContent;
 
 pub(crate) fn interpolate_input_with_env(
     common_content: &CommonContent,
+    ignore_errors: bool
 ) -> Result<CommonContent, VermanSchemaError> {
     let content = common_content.content.to_owned();
     let env: indexmap::IndexMap<String, serde_json::Value> = match common_content.env {
@@ -24,7 +25,15 @@ pub(crate) fn interpolate_input_with_env(
         }
         let variables = make_subst_map(&env);
 
-        let substituted = subst::substitute(input_s.as_str(), &variables)?;
+        let substituted = match subst::substitute(input_s.as_str(), &variables) {
+            Ok(s) => s,
+            Err(e) => {
+                if !ignore_errors {
+                    return Err(e.into())
+                }
+                input_s.to_owned()
+            }
+        };
         Ok(CommonContent {
             content: Some(serde_json::Value::String(String::from(substituted))),
             env: Some(env.clone()),
@@ -63,9 +72,10 @@ pub(crate) fn interpolate_input_with_env(
 
 pub(crate) fn interpolate_input_else_get_prior_output(
     common_content: &CommonContent,
+    ignore_substitution_errors: bool
 ) -> Result<CommonContent, VermanSchemaError> {
     let common_content_out = {
-        let mut common = match interpolate_input_with_env(common_content) {
+        let mut common = match interpolate_input_with_env(common_content, ignore_substitution_errors) {
             Ok(out) => out,
             Err(e) => match e {
                 VermanSchemaError::NotFound(_) => CommonContent {

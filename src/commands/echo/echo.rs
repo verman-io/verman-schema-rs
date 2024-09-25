@@ -3,7 +3,7 @@ use crate::errors::VermanSchemaError;
 use crate::models::CommonContent;
 
 pub fn echo(common_content: &CommonContent) -> Result<CommonContent, VermanSchemaError> {
-    let common_content_out = interpolate_input_else_get_prior_output(common_content)?;
+    let common_content_out = interpolate_input_else_get_prior_output(common_content, false)?;
     if let Some(ref content) = common_content_out.content {
         match content {
             serde_json::Value::String(s) => println!("{}", s),

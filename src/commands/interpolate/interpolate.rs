@@ -3,7 +3,7 @@ use crate::errors::VermanSchemaError;
 use crate::models::CommonContent;
 
 pub fn interpolate(common_content: &CommonContent) -> Result<CommonContent, VermanSchemaError> {
-    let common_content_out = interpolate_input_else_get_prior_output(common_content)?;
+    let common_content_out = interpolate_input_else_get_prior_output(common_content, true)?;
     if let Some(ref content) = common_content_out.content {
         if let Some(ref env) = common_content.env {
             let variables = make_subst_map(env);

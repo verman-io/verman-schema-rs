@@ -8,7 +8,7 @@ use crate::models::CommonContent;
 mod jaq_utils;
 
 pub fn jaq(common_content: &CommonContent) -> Result<CommonContent, VermanSchemaError> {
-    let common_content_out = interpolate_input_else_get_prior_output(common_content)?;
+    let common_content_out = interpolate_input_else_get_prior_output(common_content, true)?;
 
     let content = common_content_out.content.clone();
     let env = common_content_out.env.clone();

@@ -21,10 +21,10 @@ serde = { version = "^1", features = ["serde_derive"] }
 serde-json-extensions = { git = "https://github.com/SamuelMarks/serde-json-extensions", version = "0.0.1" }
 serde_derive = "^1"
 serde_json = { version = "^1", features = ["indexmap", "preserve_order"] }
+serde_yaml = "0.9.34"
 subst = { version = "^0.3", features = ["preserve-order"] }
 tokio = { version = "^1.40", features = ["macros"] }
 toml = { version = "^0.8", features = ["indexmap", "preserve_order"] }
-serde_yaml = "0.9.34"
 
 [features]
 # Use an arbitrary precision number representation for JSON `Number`. This
